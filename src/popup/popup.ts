@@ -473,8 +473,8 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
                 const fiatAmount = await satsToFiat(balance, displayCurrency);
                 if (fiatAmount !== null) {
                     const fiatDisplay = formatFiat(fiatAmount, displayCurrency);
-                    balanceElement.textContent = fiatDisplay;
-                    balanceFiatElement.textContent = `${balance.toLocaleString()} sats`;
+                    balanceElement.textContent = `${balance.toLocaleString()} sats`;
+                    balanceFiatElement.textContent = fiatDisplay;
                     balanceFiatElement.classList.remove('hidden');
 
                     const fiatCacheUpdate: Record<string, any> = {
