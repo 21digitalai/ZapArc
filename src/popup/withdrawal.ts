@@ -10,7 +10,6 @@ import {
 } from './state';
 import { isExistingContact, openContactModalWithAddress } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
-import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
@@ -747,17 +746,6 @@ export async function sendPayment(): Promise<void> {
         }
 
         setPreparedPayment(null);
-
-        try {
-            const input = paymentInput.value.trim().toLowerCase();
-            // Only trigger remote notifications by unique identifier (lightning address), not pubkey/invoice destination.
-            if (input.includes('@')) {
-                const amountEl = document.getElementById('preview-amount');
-                const amountText = amountEl?.textContent || '0';
-                const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                triggerPaymentNotification({ lightningAddress: input }, amount).catch(() => {});
-            }
-        } catch {}
 
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
 
