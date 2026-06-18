@@ -666,22 +666,43 @@ export function displayPaymentPreview(previewData: any): void {
     const totalEl = document.getElementById('preview-total');
 
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
-    if (amountEl) amountEl.textContent = `${previewData.amount.toLocaleString()} sats`;
-    if (feeEl) feeEl.textContent = `${previewData.fee.toLocaleString()} sats`;
-    
     const total = previewData.amount + previewData.fee;
-    if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
-
-    // Add fiat equivalent to total
-    satsToFiat(total, userFiatCurrency).then(fiatAmount => {
-        if (fiatAmount !== null && totalEl) {
-            totalEl.textContent = `${total.toLocaleString()} sats (≈ ${formatFiat(fiatAmount, userFiatCurrency)})`;
-        }
-    });
+    setPreviewAmount(amountEl, previewData.amount);
+    setPreviewAmount(feeEl, previewData.fee);
+    setPreviewAmount(totalEl, total);
 
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
     sendBtn.disabled = false;
+}
+
+function setPreviewAmount(element: HTMLElement | null, sats: number): void {
+    if (!element) return;
+
+    element.textContent = '';
+    const satsEl = document.createElement('span');
+    satsEl.className = 'preview-sats';
+    satsEl.textContent = `${sats.toLocaleString()} sats`;
+
+    const fiatEl = document.createElement('span');
+    fiatEl.className = 'preview-fiat';
+    fiatEl.textContent = '≈ ...';
+
+    element.append(satsEl, fiatEl);
+
+    const currency = userFiatCurrency;
+
+    satsToFiat(sats, currency)
+        .then(fiatAmount => {
+            if (fiatAmount === null) {
+                fiatEl.textContent = 'Fiat unavailable';
+                return;
+            }
+            fiatEl.textContent = `≈ ${formatFiat(fiatAmount, currency)}`;
+        })
+        .catch(() => {
+            fiatEl.textContent = 'Fiat unavailable';
+        });
 }
 
 export async function sendPayment(): Promise<void> {

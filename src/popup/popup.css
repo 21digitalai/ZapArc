@@ -3786,7 +3786,10 @@ body.modal-open {
 .payment-preview { padding: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 16px; }
 .payment-preview-title { margin-bottom: 12px; }
 .payment-preview-row { display: flex; justify-content: space-between; margin-bottom: 8px; overflow: hidden; }
-.payment-preview-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; text-align: right; }
+.payment-preview-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; text-align: right; }
+.payment-preview-value.amount { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: normal; }
+.preview-sats { font-weight: 700; }
+.preview-fiat { color: var(--text-secondary); font-size: 11px; font-weight: 500; line-height: 1.2; }
 .payment-preview-total { padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); margin-bottom: 0; }
 
 .contact-main-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -4215,4 +4218,3 @@ body.modal-open {
 .confirm-dialog-btn-confirm:hover {
   background: var(--brand-hover);
 }
-
