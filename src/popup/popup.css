@@ -3792,6 +3792,64 @@ body.modal-open {
 .preview-fiat { color: var(--text-secondary); font-size: 11px; font-weight: 500; line-height: 1.2; }
 .payment-preview-total { padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); margin-bottom: 0; }
 
+.save-contact-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -6px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(247, 147, 26, 0.28);
+  border-radius: 8px;
+  background: rgba(247, 147, 26, 0.10);
+}
+
+.save-contact-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.save-contact-copy strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.save-contact-copy span {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.save-contact-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.save-contact-actions button {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.btn-text {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  color: var(--text-primary);
+}
+
 .contact-main-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .contact-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .contact-self-badge { border-radius: 999px; padding: 2px 8px; }

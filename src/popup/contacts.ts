@@ -4,6 +4,7 @@ import { ChromeStorageManager } from '../utils/storage';
 import type { Contact } from '../types';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { showModal, hideModal } from './modals';
+import { hideAllViews } from './view-manager';
 
 const storage = new ChromeStorageManager();
 const LIGHTNING_ADDRESS_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -31,6 +32,10 @@ function createContactAvatar(name: string): HTMLElement {
   avatar.textContent = (name.trim().charAt(0) || '?').toUpperCase();
   avatar.style.background = getContactAvatarColor(name);
   return avatar;
+}
+
+function getContactDisplayName(contact: Pick<Contact, 'name' | 'lightningAddress'>): string {
+  return contact.name?.trim() || contact.lightningAddress;
 }
 
 function getMyLightningAddress(): string | null {
@@ -76,8 +81,7 @@ export function initializeContactsUI(): void {
 }
 
 export async function showContactsInterface(): Promise<void> {
-  const mainInterface = document.getElementById('main-interface');
-  if (mainInterface) mainInterface.classList.add('hidden');
+  hideAllViews();
 
   const contactsInterface = document.getElementById('contacts-interface');
   if (contactsInterface) contactsInterface.classList.remove('hidden');
@@ -106,7 +110,7 @@ export async function isExistingContact(lightningAddress: string): Promise<boole
  * Open the contact modal pre-filled with a lightning address (for "Save as Contact" after payment)
  */
 export function openContactModalWithAddress(lightningAddress: string): void {
-  openContactModal({ lightningAddress, name: '', id: '', createdAt: 0, updatedAt: 0 } as Contact);
+  openContactModal({ lightningAddress, name: '' });
 }
 
 export async function openContactPicker(onSelect: (contact: Contact) => void): Promise<void> {
@@ -118,7 +122,7 @@ export async function openContactPicker(onSelect: (contact: Contact) => void): P
 
 async function loadContacts(): Promise<void> {
   cachedContacts = await storage.getContacts();
-  cachedContacts.sort((a, b) => a.name.localeCompare(b.name));
+  cachedContacts.sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b)));
 }
 
 function renderContactsList(): void {
@@ -144,6 +148,7 @@ function renderContactsList(): void {
   if (emptyState) emptyState.classList.add('hidden');
 
   filtered.forEach(contact => {
+    const displayName = getContactDisplayName(contact);
     const item = document.createElement('div');
     item.className = 'contact-item';
     item.dataset.id = contact.id;
@@ -151,7 +156,7 @@ function renderContactsList(): void {
     const mainInfo = document.createElement('div');
     mainInfo.className = 'contact-main-info';
 
-    const avatar = createContactAvatar(contact.name);
+    const avatar = createContactAvatar(displayName);
 
     const info = document.createElement('div');
     info.className = 'contact-info';
@@ -161,7 +166,7 @@ function renderContactsList(): void {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'contact-name';
-    nameEl.textContent = contact.name;
+    nameEl.textContent = displayName;
 
     nameRow.appendChild(nameEl);
 
@@ -243,6 +248,7 @@ function renderContactPickerList(): void {
   if (emptyState) emptyState.classList.add('hidden');
 
   filtered.forEach(contact => {
+    const displayName = getContactDisplayName(contact);
     const item = document.createElement('div');
     item.className = 'contact-item';
     item.dataset.id = contact.id;
@@ -250,7 +256,7 @@ function renderContactPickerList(): void {
     const mainInfo = document.createElement('div');
     mainInfo.className = 'contact-main-info';
 
-    const avatar = createContactAvatar(contact.name);
+    const avatar = createContactAvatar(displayName);
 
     const info = document.createElement('div');
     info.className = 'contact-info';
@@ -260,7 +266,7 @@ function renderContactPickerList(): void {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'contact-name';
-    nameEl.textContent = contact.name;
+    nameEl.textContent = displayName;
 
     nameRow2.appendChild(nameEl);
 
@@ -294,8 +300,9 @@ function renderContactPickerList(): void {
   });
 }
 
-export function openContactModal(contact?: Contact): void {
+export function openContactModal(contact?: Partial<Contact>): void {
   currentEditId = contact?.id || null;
+  const isEditing = Boolean(currentEditId);
 
   const title = document.getElementById('contact-modal-title');
   const nameInput = document.getElementById('contact-name-input') as HTMLInputElement | null;
@@ -303,7 +310,7 @@ export function openContactModal(contact?: Contact): void {
   const notesInput = document.getElementById('contact-notes-input') as HTMLTextAreaElement | null;
   const errorEl = document.getElementById('contact-modal-error');
 
-  if (title) title.textContent = contact ? 'Edit Contact' : 'Add Contact';
+  if (title) title.textContent = isEditing ? 'Edit Contact' : 'Add Contact';
   if (nameInput) nameInput.value = contact?.name || '';
   if (addressInput) addressInput.value = contact?.lightningAddress || '';
   if (notesInput) notesInput.value = contact?.notes || '';
@@ -341,7 +348,7 @@ async function handleSaveContact(): Promise<void> {
   const addressChanged = !existingContact || existingContact.lightningAddress.toLowerCase() !== lightningAddress.toLowerCase();
 
   if (addressChanged) {
-    const saveBtn = document.getElementById('contact-save-btn') as HTMLButtonElement | null;
+    const saveBtn = document.getElementById('contact-modal-save') as HTMLButtonElement | null;
     const origText = saveBtn?.textContent || 'Save';
     if (saveBtn) {
       saveBtn.disabled = true;
@@ -366,10 +373,11 @@ async function handleSaveContact(): Promise<void> {
   }
 
   const now = Date.now();
+  const displayName = name || lightningAddress;
   try {
     if (currentEditId) {
       await storage.updateContact(currentEditId, {
-        name,
+        name: displayName,
         lightningAddress,
         notes: notes || undefined,
         updatedAt: now
@@ -378,7 +386,7 @@ async function handleSaveContact(): Promise<void> {
     } else {
       const contact: Contact = {
         id: crypto.randomUUID(),
-        name,
+        name: displayName,
         lightningAddress,
         notes: notes || undefined,
         createdAt: now,
@@ -398,7 +406,7 @@ async function handleSaveContact(): Promise<void> {
 }
 
 async function handleDeleteContact(contact: Contact): Promise<void> {
-  const confirmed = await showConfirmDialog('Delete Contact', `Delete ${contact.name}?`);
+  const confirmed = await showConfirmDialog('Delete Contact', `Delete ${getContactDisplayName(contact)}?`);
   if (!confirmed) return;
 
   try {
@@ -418,7 +426,7 @@ function closePicker(): void {
 
 function matchesQuery(contact: Contact, query: string): boolean {
   if (!query) return true;
-  return contact.name.toLowerCase().includes(query)
+  return getContactDisplayName(contact).toLowerCase().includes(query)
     || contact.lightningAddress.toLowerCase().includes(query)
     || (contact.notes || '').toLowerCase().includes(query);
 }
@@ -467,9 +475,6 @@ async function verifyLightningAddress(address: string): Promise<{ isValid: boole
 }
 
 function validateContact(name: string, lightningAddress: string, notes: string): { isValid: boolean; error?: string } {
-  if (!name) {
-    return { isValid: false, error: 'Name is required' };
-  }
   if (name.length > MAX_NAME_LENGTH) {
     return { isValid: false, error: `Name must be ${MAX_NAME_LENGTH} characters or less` };
   }

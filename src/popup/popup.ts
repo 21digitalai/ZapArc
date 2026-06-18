@@ -86,6 +86,7 @@ import {
 
 // Contacts imports
 import { initializeContactsUI, showContactsInterface } from './contacts';
+import { hideAllViews } from './view-manager';
 
 // Utility imports
 import { ExtensionMessaging } from '../utils/messaging';
@@ -120,38 +121,6 @@ function generateAndValidateMnemonic(): string {
     throw new Error('Failed to generate a valid 12-word mnemonic after 3 attempts');
 }
 
-
-// ========================================
-// View Management
-// ========================================
-
-/** All top-level view container IDs. Only one should be visible at a time. */
-const ALL_VIEW_IDS = [
-    'main-interface',
-    'unlock-interface',
-    'onboarding-wizard',
-    'deposit-interface',
-    'withdraw-interface',
-    'settings-interface',
-    'contacts-interface',
-    'wallet-management-interface',
-    'wallet-selection-interface',
-    'archived-wallets-interface',
-    'rename-wallet-interface',
-    'transaction-history-view',
-    'qr-only-interface',
-] as const;
-
-/**
- * Hide all top-level views. Call before showing any single view
- * to prevent the "two views visible at once" bug.
- */
-function hideAllViews(): void {
-    for (const id of ALL_VIEW_IDS) {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
-    }
-}
 
 // ========================================
 // Balance & Transaction Functions

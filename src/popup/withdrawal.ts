@@ -8,7 +8,7 @@ import {
     preparedPayment,
     setPreparedPayment
 } from './state';
-import { isExistingContact, openContactModalWithAddress } from './contacts';
+import { isExistingContact, openContactModalWithAddress, showContactsInterface } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
@@ -25,6 +25,8 @@ let withdrawalListenersInitialized = false;
 let activeSendTab: 'lightning' | 'onchain' = 'lightning';
 let onchainPreparedBySpeed: Partial<Record<'fast' | 'medium' | 'slow', any>> = {};
 let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
+let dismissedSaveContactAddress: string | null = null;
+let paymentSendInProgress = false;
 
 // Currency toggle state for send amount input
 let sendInputCurrency: DisplayCurrency = 'sats';
@@ -51,6 +53,64 @@ function updateCurrencyToggleUI(): void {
 
     // Update conversion hint based on current input value
     updateConversionHint();
+}
+
+function getLightningAddressCandidate(input: string): string | null {
+    const candidate = input.trim();
+    const lower = candidate.toLowerCase();
+    if (lower.startsWith('lnurl')) return null;
+    if (!/^[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(candidate)) return null;
+    return candidate;
+}
+
+function hideSaveContactPrompt(): void {
+    const prompt = document.getElementById('save-contact-prompt');
+    prompt?.classList.add('hidden');
+}
+
+async function maybeShowSaveContactPrompt(recipient: string, type: string): Promise<void> {
+    const prompt = document.getElementById('save-contact-prompt');
+    const addressEl = document.getElementById('save-contact-address');
+    const saveBtn = document.getElementById('save-contact-save-btn') as HTMLButtonElement | null;
+    const cancelBtn = document.getElementById('save-contact-cancel-btn') as HTMLButtonElement | null;
+    if (!prompt || !addressEl || !saveBtn || !cancelBtn) return;
+
+    hideSaveContactPrompt();
+
+    if (type !== 'lnurl') return;
+    const address = getLightningAddressCandidate(recipient);
+    if (!address) return;
+
+    const addressKey = address.toLowerCase();
+    if (dismissedSaveContactAddress === addressKey) return;
+
+    try {
+        if (await isExistingContact(address)) return;
+    } catch (error) {
+        console.warn('[Withdrawal] Failed to check contact book:', error);
+        return;
+    }
+
+    addressEl.textContent = address;
+    saveBtn.onclick = async (event) => {
+        event.preventDefault();
+        saveBtn.disabled = true;
+        try {
+            hideSaveContactPrompt();
+            await showContactsInterface();
+            openContactModalWithAddress(address);
+        } finally {
+            saveBtn.disabled = false;
+        }
+    };
+
+    cancelBtn.onclick = (event) => {
+        event.preventDefault();
+        dismissedSaveContactAddress = addressKey;
+        hideSaveContactPrompt();
+    };
+
+    prompt.classList.remove('hidden');
 }
 
 /** Show live conversion below the amount input */
@@ -157,6 +217,8 @@ export function resetWithdrawForm(): void {
     }
     if (commentInput) commentInput.value = '';
     previewDiv?.classList.add('hidden');
+    hideSaveContactPrompt();
+    dismissedSaveContactAddress = null;
 
     updateCurrencyToggleUI();
     const conversionHint = document.getElementById('send-conversion-hint');
@@ -674,6 +736,7 @@ export function displayPaymentPreview(previewData: any): void {
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
     sendBtn.disabled = false;
+    void maybeShowSaveContactPrompt(previewData.recipient || '', previewData.type || '');
 }
 
 function setPreviewAmount(element: HTMLElement | null, sats: number): void {
@@ -712,9 +775,12 @@ export async function sendPayment(): Promise<void> {
     const statusText = document.getElementById('withdrawal-status-text');
 
     if (!paymentInput || !sendBtn) return;
+    if (paymentSendInProgress) return;
 
     const confirmed = await showConfirmDialog('Confirm Payment', 'Are you sure you want to send this payment? This action cannot be undone.');
     if (!confirmed) return;
+
+    paymentSendInProgress = true;
 
     try {
         if (!breezSDK) {
@@ -724,6 +790,7 @@ export async function sendPayment(): Promise<void> {
 
         sendBtn.disabled = true;
         sendBtn.textContent = 'Sending...';
+        hideSaveContactPrompt();
 
         statusDiv?.classList.remove('hidden');
         if (statusText) statusText.textContent = 'Processing payment...';
@@ -803,33 +870,7 @@ export async function sendPayment(): Promise<void> {
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
 
-        // Offer to save recipient as contact (only for LNURL/lightning address payments)
-        const recipientInput = document.getElementById('payment-input') as HTMLTextAreaElement;
-        const recipientAddress = recipientInput?.value?.trim() || '';
-        if (recipientAddress.includes('@') && !isPending) {
-            try {
-                const alreadySaved = await isExistingContact(recipientAddress);
-                if (!alreadySaved) {
-                    setTimeout(() => {
-                        if (statusText) {
-                            statusText.innerHTML = `✅ Payment sent! <a href="#" id="save-contact-link" style="color: var(--brand, #FFC107); text-decoration: underline; cursor: pointer;">Save as contact?</a>`;
-                            document.getElementById('save-contact-link')?.addEventListener('click', (e) => {
-                                e.preventDefault();
-                                openContactModalWithAddress(recipientAddress);
-                            });
-                        }
-                    }, 100);
-                    // Don't auto-hide, let user see the save prompt
-                    setTimeout(() => hideWithdrawInterface(), 5000);
-                } else {
-                    setTimeout(() => hideWithdrawInterface(), 1500);
-                }
-            } catch {
-                setTimeout(() => hideWithdrawInterface(), 1500);
-            }
-        } else {
-            setTimeout(() => hideWithdrawInterface(), 1500);
-        }
+        setTimeout(() => hideWithdrawInterface(), 1500);
 
         // Retry in case tx doesn't appear immediately
         for (const delayMs of [2000, 5000]) {
@@ -846,6 +887,7 @@ export async function sendPayment(): Promise<void> {
         }
         showError(error instanceof Error ? error.message : 'Failed to send payment');
     } finally {
+        paymentSendInProgress = false;
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send Payment';
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
