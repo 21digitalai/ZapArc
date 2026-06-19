@@ -47,13 +47,23 @@ body.full-window-mode {
   height: auto;
   display: flex;
   justify-content: center;
-  padding: 20px 14px;
+  align-items: flex-start;
+  padding: 28px 16px;
   box-sizing: border-box;
+  background:
+    radial-gradient(circle at top, rgba(247, 147, 26, 0.14), transparent 34rem),
+    linear-gradient(180deg, #0b1020 0%, #101827 46%, #07111f 100%);
 }
 
 body.full-window-mode #app {
   width: min(480px, 100%);
-  min-height: calc(100vh - 40px);
+  min-height: calc(100vh - 56px);
+  max-height: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(26, 26, 46, 0.96), rgba(15, 52, 96, 0.92));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(247, 147, 26, 0.08);
+  overflow: hidden;
 }
 
 body.full-window-mode header {
@@ -62,6 +72,29 @@ body.full-window-mode header {
 
 body.full-window-mode #wallet-section {
   padding: 16px;
+}
+
+body.full-window-mode #settings-interface,
+body.full-window-mode #wallet-interface,
+body.full-window-mode #onboarding-wizard {
+  min-height: calc(100vh - 56px);
+}
+
+@media (max-width: 520px) {
+  body.full-window-mode {
+    padding: 16px 10px;
+  }
+
+  body.full-window-mode #app,
+  body.full-window-mode #settings-interface,
+  body.full-window-mode #wallet-interface,
+  body.full-window-mode #onboarding-wizard {
+    min-height: calc(100vh - 32px);
+  }
+
+  body.full-window-mode #app {
+    border-radius: 16px;
+  }
 }
 
 /* Dark scrollbar */

@@ -40,6 +40,8 @@
 
 ## Surfaces
 
+`body.full-window-mode #app` — framed full extension/fullscreen shell. Use only for `?view=full` so popup mode keeps the fixed browser-extension dimensions.
+
 `.payment-preview` — framed payment confirmation panel for send flows.
 
 `.withdraw-form-container` — send form surface.
