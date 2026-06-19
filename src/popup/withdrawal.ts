@@ -8,7 +8,7 @@ import {
     preparedPayment,
     setPreparedPayment
 } from './state';
-import { isExistingContact, openContactModalWithAddress, showContactsInterface } from './contacts';
+import { isExistingContact, saveContactFromPrompt } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
@@ -27,6 +27,8 @@ let onchainPreparedBySpeed: Partial<Record<'fast' | 'medium' | 'slow', any>> = {
 let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
 let dismissedSaveContactAddress: string | null = null;
 let paymentSendInProgress = false;
+
+const POST_PAYMENT_SAVE_CONTACT_DELAY_MS = 900;
 
 // Currency toggle state for send amount input
 let sendInputCurrency: DisplayCurrency = 'sats';
@@ -55,62 +57,123 @@ function updateCurrencyToggleUI(): void {
     updateConversionHint();
 }
 
-function getLightningAddressCandidate(input: string): string | null {
-    const candidate = input.trim();
+function getContactSaveCandidate(input: string): string | null {
+    const candidate = input.trim().replace(/^lightning:/i, '');
     const lower = candidate.toLowerCase();
-    if (lower.startsWith('lnurl')) return null;
-    if (!/^[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(candidate)) return null;
-    return candidate;
+    const match = candidate.match(/[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+    if (match) return match[0];
+
+    const lnurlMatch = candidate.match(/lnurl[a-z0-9]{15,}/i);
+    if (lnurlMatch) return lnurlMatch[0];
+
+    if (lower.startsWith('lnurl') && candidate.length >= 20) {
+        return candidate;
+    }
+
+    return null;
 }
 
 function hideSaveContactPrompt(): void {
     const prompt = document.getElementById('save-contact-prompt');
+    const nameInput = document.getElementById('save-contact-name-input') as HTMLInputElement | null;
+    const errorEl = document.getElementById('save-contact-error');
+    const saveBtn = document.getElementById('save-contact-save-btn') as HTMLButtonElement | null;
+
     prompt?.classList.add('hidden');
+    if (nameInput) nameInput.value = '';
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+    if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+    }
 }
 
-async function maybeShowSaveContactPrompt(recipient: string, type: string): Promise<void> {
+function showSaveContactPrompt(address: string): void {
     const prompt = document.getElementById('save-contact-prompt');
     const addressEl = document.getElementById('save-contact-address');
-    const saveBtn = document.getElementById('save-contact-save-btn') as HTMLButtonElement | null;
+    const nameInput = document.getElementById('save-contact-name-input') as HTMLInputElement | null;
+    const errorEl = document.getElementById('save-contact-error');
     const cancelBtn = document.getElementById('save-contact-cancel-btn') as HTMLButtonElement | null;
-    if (!prompt || !addressEl || !saveBtn || !cancelBtn) return;
+    const saveBtn = document.getElementById('save-contact-save-btn') as HTMLButtonElement | null;
 
-    hideSaveContactPrompt();
-
-    if (type !== 'lnurl') return;
-    const address = getLightningAddressCandidate(recipient);
-    if (!address) return;
-
-    const addressKey = address.toLowerCase();
-    if (dismissedSaveContactAddress === addressKey) return;
-
-    try {
-        if (await isExistingContact(address)) return;
-    } catch (error) {
-        console.warn('[Withdrawal] Failed to check contact book:', error);
+    if (!prompt || !addressEl || !nameInput || !cancelBtn || !saveBtn) {
+        console.warn('[Withdrawal] Save-contact prompt markup is missing');
         return;
     }
 
     addressEl.textContent = address;
-    saveBtn.onclick = async (event) => {
-        event.preventDefault();
-        saveBtn.disabled = true;
-        try {
-            hideSaveContactPrompt();
-            await showContactsInterface();
-            openContactModalWithAddress(address);
-        } finally {
-            saveBtn.disabled = false;
-        }
-    };
+    nameInput.value = '';
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
 
-    cancelBtn.onclick = (event) => {
-        event.preventDefault();
-        dismissedSaveContactAddress = addressKey;
+    cancelBtn.onclick = () => {
+        dismissedSaveContactAddress = address.toLowerCase();
         hideSaveContactPrompt();
     };
 
+    saveBtn.onclick = async () => {
+        const originalText = saveBtn.textContent || 'Save';
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+
+        try {
+            await saveContactFromPrompt(nameInput.value, address);
+            dismissedSaveContactAddress = address.toLowerCase();
+            hideSaveContactPrompt();
+        } catch (error) {
+            if (errorEl) {
+                errorEl.textContent = error instanceof Error ? error.message : 'Failed to save contact';
+                errorEl.classList.remove('hidden');
+            } else {
+                showError(error instanceof Error ? error.message : 'Failed to save contact');
+            }
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    };
+
     prompt.classList.remove('hidden');
+    console.log('[Withdrawal] Showing post-payment save-contact prompt for', address);
+    nameInput.focus({ preventScroll: true });
+}
+
+async function getPostPaymentSaveContactAddress(recipient: string): Promise<string | null> {
+    hideSaveContactPrompt();
+
+    const address = getContactSaveCandidate(recipient);
+    if (!address) {
+        console.log('[Withdrawal] No save-contact prompt: recipient is not a saveable Lightning Address or LNURL', recipient);
+        return null;
+    }
+
+    const addressKey = address.toLowerCase();
+    if (dismissedSaveContactAddress === addressKey) {
+        console.log('[Withdrawal] No save-contact prompt: address was dismissed', address);
+        return null;
+    }
+
+    try {
+        if (await isExistingContact(address)) {
+            console.log('[Withdrawal] No save-contact prompt: address already saved', address);
+            return null;
+        }
+    } catch (error) {
+        console.warn('[Withdrawal] Failed to check contact book:', error);
+        return null;
+    }
+
+    console.log('[Withdrawal] Post-payment save-contact candidate ready', address);
+    return address;
 }
 
 /** Show live conversion below the amount input */
@@ -736,7 +799,6 @@ export function displayPaymentPreview(previewData: any): void {
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
     sendBtn.disabled = false;
-    void maybeShowSaveContactPrompt(previewData.recipient || '', previewData.type || '');
 }
 
 function setPreviewAmount(element: HTMLElement | null, sats: number): void {
@@ -779,6 +841,9 @@ export async function sendPayment(): Promise<void> {
 
     const confirmed = await showConfirmDialog('Confirm Payment', 'Are you sure you want to send this payment? This action cannot be undone.');
     if (!confirmed) return;
+
+    const recipientAtSend = paymentInput.value.trim();
+    console.log('[Withdrawal] Recipient captured for post-payment contact prompt', recipientAtSend);
 
     paymentSendInProgress = true;
 
@@ -842,6 +907,8 @@ export async function sendPayment(): Promise<void> {
             ? result?.payment?.status
             : sendResult?.payment?.status;
         const isPending = typeof finalStatus === 'string' && finalStatus === 'pending';
+        const saveContactAddressAfterSend = await getPostPaymentSaveContactAddress(recipientAtSend);
+        console.log('[Withdrawal] Save-contact prompt after send candidate:', saveContactAddressAfterSend);
 
         if (isPending) {
             const pendingPayment = isLnurlPayment ? result?.payment : sendResult?.payment;
@@ -870,7 +937,15 @@ export async function sendPayment(): Promise<void> {
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
 
-        setTimeout(() => hideWithdrawInterface(), 1500);
+        setTimeout(() => {
+            hideWithdrawInterface();
+
+            if (saveContactAddressAfterSend) {
+                setTimeout(() => {
+                    showSaveContactPrompt(saveContactAddressAfterSend);
+                }, POST_PAYMENT_SAVE_CONTACT_DELAY_MS);
+            }
+        }, 1500);
 
         // Retry in case tx doesn't appear immediately
         for (const delayMs of [2000, 5000]) {

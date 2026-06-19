@@ -3826,22 +3826,28 @@ body.modal-open {
 .payment-preview-total { padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); margin-bottom: 0; }
 
 .save-contact-prompt {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 14px;
+  z-index: 2300;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: -6px 0 14px;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
   padding: 10px 12px;
   border: 1px solid rgba(247, 147, 26, 0.28);
-  border-radius: 8px;
-  background: rgba(247, 147, 26, 0.10);
+  border-radius: 12px;
+  background: #23233a;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.36);
 }
 
 .save-contact-copy {
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  width: 100%;
 }
 
 .save-contact-copy strong {
@@ -3850,7 +3856,7 @@ body.modal-open {
 }
 
 .save-contact-copy span {
-  max-width: 160px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3859,10 +3865,41 @@ body.modal-open {
   line-height: 1.2;
 }
 
+.save-contact-name-row {
+  width: 100%;
+}
+
+.save-contact-name-input {
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 7px 9px;
+  outline: none;
+}
+
+.save-contact-name-input:focus {
+  border-color: rgba(247, 147, 26, 0.72);
+  box-shadow: 0 0 0 2px rgba(247, 147, 26, 0.14);
+}
+
+.save-contact-error {
+  width: 100%;
+  color: #ff6b6b;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .save-contact-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  width: 100%;
   flex-shrink: 0;
 }
 

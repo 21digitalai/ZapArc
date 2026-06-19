@@ -5,9 +5,11 @@ import type { Contact } from '../types';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { showModal, hideModal } from './modals';
 import { hideAllViews } from './view-manager';
+import { breezSDK } from './state';
 
 const storage = new ChromeStorageManager();
 const LIGHTNING_ADDRESS_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const LNURL_REGEX = /^lnurl[a-z0-9]{15,}$/i;
 const MAX_NAME_LENGTH = 100;
 const MAX_NOTES_LENGTH = 500;
 
@@ -104,6 +106,41 @@ export function hideContactsInterface(): void {
 export async function isExistingContact(lightningAddress: string): Promise<boolean> {
   await loadContacts();
   return cachedContacts.some(c => c.lightningAddress.toLowerCase() === lightningAddress.toLowerCase());
+}
+
+export async function saveContactFromPrompt(name: string, lightningAddress: string): Promise<Contact> {
+  const normalizedName = name.trim();
+  const normalizedAddress = lightningAddress.trim();
+  const validation = validateContact(normalizedName, normalizedAddress, '');
+  if (!validation.isValid) {
+    throw new Error(validation.error || 'Invalid contact');
+  }
+
+  const resolveResult = await verifyLightningAddress(normalizedAddress);
+  if (!resolveResult.isValid) {
+    throw new Error(resolveResult.error || 'Lightning address could not be verified');
+  }
+
+  const now = Date.now();
+  const displayName = normalizedName || normalizedAddress;
+  const savedContact: Contact = {
+    id: crypto.randomUUID(),
+    name: displayName,
+    lightningAddress: normalizedAddress,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  await storage.addContact(savedContact);
+  await loadContacts();
+  renderContactsList();
+  renderContactPickerList();
+  showSuccess('Contact added');
+
+  return {
+    ...savedContact,
+    lightningAddress: normalizedAddress.toLowerCase()
+  };
 }
 
 /**
@@ -398,6 +435,9 @@ async function handleSaveContact(): Promise<void> {
 
     await loadContacts();
     renderContactsList();
+    renderContactPickerList();
+
+    currentEditId = null;
     hideModal('contact-modal');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to save contact';
@@ -432,6 +472,22 @@ function matchesQuery(contact: Contact, query: string): boolean {
 }
 
 async function verifyLightningAddress(address: string): Promise<{ isValid: boolean; error?: string }> {
+  if (LNURL_REGEX.test(address.trim())) {
+    if (!breezSDK) {
+      return { isValid: true };
+    }
+
+    try {
+      const parsed = await breezSDK.parse(address.trim());
+      if (parsed.type !== 'lnurlPay' && parsed.type !== 'lightningAddress') {
+        return { isValid: false, error: 'LNURL does not support payments' };
+      }
+      return { isValid: true };
+    } catch {
+      return { isValid: false, error: 'Could not verify LNURL' };
+    }
+  }
+
   const [username, domain] = address.trim().split('@');
   const lnurlEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
 
@@ -481,8 +537,8 @@ function validateContact(name: string, lightningAddress: string, notes: string):
   if (!lightningAddress) {
     return { isValid: false, error: 'Lightning address is required' };
   }
-  if (!LIGHTNING_ADDRESS_REGEX.test(lightningAddress)) {
-    return { isValid: false, error: 'Lightning address must be in user@domain.tld format' };
+  if (!LIGHTNING_ADDRESS_REGEX.test(lightningAddress) && !LNURL_REGEX.test(lightningAddress)) {
+    return { isValid: false, error: 'Enter a Lightning Address or LNURL' };
   }
   if (notes.length > MAX_NOTES_LENGTH) {
     return { isValid: false, error: `Notes must be ${MAX_NOTES_LENGTH} characters or less` };
