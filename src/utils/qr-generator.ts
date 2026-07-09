@@ -1,4 +1,4 @@
-// QR Code Generator for Lightning Network Tipping Extension
+// QR Code Generator for ZapArc Lightning payments
 // Generates QR codes for Lightning payments and LNURL-pay requests
 
 import * as QRCode from 'qrcode';

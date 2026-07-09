@@ -204,7 +204,7 @@ export interface ChromeStorageSchema {
 
 // Message types for communication between components
 export interface ContentMessage {
-  type: 'TIP_DETECTED' | 'POSTING_CONTEXT' | 'DOMAIN_STATUS';
+  type: 'POSTING_CONTEXT' | 'DOMAIN_STATUS';
   data: any;
 }
 
@@ -214,6 +214,6 @@ export interface PopupMessage {
 }
 
 export interface FloatingMessage {
-  type: 'QUICK_DEPOSIT' | 'COPY_TIP_STRING' | 'DOMAIN_TOGGLE';
+  type: 'QUICK_DEPOSIT' | 'DOMAIN_TOGGLE';
   data: any;
 }
