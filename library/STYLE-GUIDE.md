@@ -102,3 +102,9 @@
 `.preview-sats` — primary satoshi amount within `.payment-preview-value.amount`.
 
 `.preview-fiat` — secondary fiat equivalent or unavailable state within `.payment-preview-value.amount`.
+
+`.save-contact-prompt` — compact fixed prompt shown after previewing an unsaved Lightning Address/LNURL recipient.
+
+`.save-contact-copy` — stacked prompt title and truncated recipient address inside `.save-contact-prompt`.
+
+`.save-contact-actions` — right-aligned Cancel/Save actions for the save-contact prompt.
