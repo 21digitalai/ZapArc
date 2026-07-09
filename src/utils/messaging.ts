@@ -332,37 +332,6 @@ export class ExtensionMessaging {
   }
 
   /**
-   * Parse tip request string
-   */
-  static async parseTipRequest(tipString: string): Promise<MessageResponse<any>> {
-    return this.sendToBackground({
-      type: 'PARSE_TIP_REQUEST',
-      tipString
-    });
-  }
-
-  /**
-   * Generate tip request string
-   */
-  static async generateTipRequest(lnurl: string, amounts: [number, number, number]): Promise<MessageResponse<string>> {
-    return this.sendToBackground({
-      type: 'GENERATE_TIP_REQUEST',
-      lnurl,
-      amounts
-    });
-  }
-
-  /**
-   * Generate user's tip request string
-   */
-  static async generateUserTipRequest(amounts?: [number, number, number]): Promise<MessageResponse<string>> {
-    return this.sendToBackground({
-      type: 'GENERATE_USER_TIP_REQUEST',
-      amounts
-    });
-  }
-
-  /**
    * Get LNURL payment limits
    */
   static async getLnurlPaymentLimits(lnurl: string): Promise<MessageResponse<any>> {

@@ -35,8 +35,6 @@ async function loadSettings(): Promise<void> {
 
 function getDefaultSettings(): UserSettings {
     return {
-        defaultPostingAmounts: [100, 500, 1000],
-        defaultTippingAmounts: [100, 500, 1000],
         useBuiltInWallet: true,
         floatingMenuEnabled: true,
         autoLockTimeout: 900,
@@ -181,8 +179,6 @@ async function saveSettings(): Promise<void> {
         const newSettings: UserSettings = {
             useBuiltInWallet: builtinRadio.checked,
             customLNURL: builtinRadio.checked ? undefined : customLnurlInput.value.trim() || undefined,
-            defaultPostingAmounts: currentSettings.defaultPostingAmounts,
-            defaultTippingAmounts: currentSettings.defaultTippingAmounts,
             floatingMenuEnabled: (document.getElementById('floating-menu-enabled') as HTMLInputElement).checked,
             autoLockTimeout: autoLockTimeout.timeout!,
             facebookPostingMode: currentSettings.facebookPostingMode,
@@ -430,12 +426,7 @@ WALLET CONFIGURATION:
 • Built-in Wallet: Recommended for most users. Uses Breez SDK for full Lightning functionality.
 • Custom LNURL: For advanced users with existing Lightning wallets or services.
 
-AMOUNTS:
-• Posting Amounts: Suggested tip amounts included in your posts/comments.
-• Payment Amounts: Your preferred amounts when sending payments.
-• All amounts are in satoshis (sats). 1 BTC = 100,000,000 sats.
-
-SECURITY:
+    SECURITY:
 • Auto-lock: Automatically locks wallet after inactivity.
 • Shorter timeouts are more secure but less convenient.
 

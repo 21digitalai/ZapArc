@@ -1,12 +1,4 @@
-// Type definitions for Lightning Network Tipping Extension
-
-export interface TipRequest {
-  lnurl: string;
-  suggestedAmounts: [number, number, number];
-  source: 'text' | 'metadata';
-  element?: HTMLElement;
-  isBlacklisted: boolean;
-}
+// Type definitions for ZapArc wallet extension
 
 export interface WalletData {
   mnemonic: string;
@@ -137,8 +129,6 @@ export const HIERARCHICAL_WALLET_CONSTANTS = {
 } as const;
 
 export interface UserSettings {
-  defaultPostingAmounts: [number, number, number];
-  defaultTippingAmounts: [number, number, number];
   customLNURL?: string;
   useBuiltInWallet: boolean;
   floatingMenuEnabled: boolean;

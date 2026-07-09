@@ -30,6 +30,7 @@ export function generateUUID(): string {
 export class ChromeStorageManager {
   // TODO(security): migrate legacy static salt usage to per-wallet random salts for all encryption paths.
   // Keep current value for backward compatibility with existing encrypted wallets.
+  // Keep the original salt so existing encrypted wallets remain decryptable.
   private static readonly SALT = 'lightning-tipping-salt';
   private static readonly ITERATIONS = 100000;
   private static _storageMutex: Promise<void> = Promise.resolve();
@@ -353,8 +354,6 @@ export class ChromeStorageManager {
 
         // Properly merge settings, preserving 0 values (like autoLockTimeout: 0 for "Never")
         const merged: UserSettings = {
-          defaultPostingAmounts: result.userSettings.defaultPostingAmounts || defaults.defaultPostingAmounts,
-          defaultTippingAmounts: result.userSettings.defaultTippingAmounts || defaults.defaultTippingAmounts,
           useBuiltInWallet: result.userSettings.useBuiltInWallet !== undefined ? result.userSettings.useBuiltInWallet : defaults.useBuiltInWallet,
           floatingMenuEnabled: result.userSettings.floatingMenuEnabled !== undefined ? result.userSettings.floatingMenuEnabled : defaults.floatingMenuEnabled,
           autoLockTimeout: result.userSettings.autoLockTimeout !== undefined ? result.userSettings.autoLockTimeout : defaults.autoLockTimeout,
@@ -602,8 +601,6 @@ export class ChromeStorageManager {
    */
   private getDefaultSettings(): UserSettings {
     return {
-      defaultPostingAmounts: [100, 500, 1000],
-      defaultTippingAmounts: [100, 500, 1000],
       useBuiltInWallet: true,
       floatingMenuEnabled: true,
       autoLockTimeout: 900, // 15 minutes

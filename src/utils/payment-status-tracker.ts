@@ -1,4 +1,4 @@
-// Payment Status Tracker for Lightning Network Tipping Extension
+// Payment Status Tracker for ZapArc wallet payments
 // Provides real-time payment status updates and user feedback
 
 import { PaymentStatus } from './payment-processor';

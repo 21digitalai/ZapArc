@@ -1,4 +1,4 @@
-// Background service worker for Lightning Network Tipping Extension
+// Background service worker for ZapArc wallet extension
 // Handles Breez SDK operations, storage management, and message passing
 
 import { WalletData, UserSettings } from '../types';
@@ -11,7 +11,7 @@ import * as bip39 from 'bip39';
 // This is a client certificate provided by Breez for authentication
 const BREEZ_API_KEY = 'MIIBfjCCATCgAwIBAgIHPoqCRCUxZzAFBgMrZXAwEDEOMAwGA1UEAxMFQnJlZXowHhcNMjUxMDEzMTY0NzQ0WhcNMzUxMDExMTY0NzQ0WjAwMRUwEwYDVQQKEwxCVEMgSE9ETCBMdGQxFzAVBgNVBAMTDlBsYW1lbiBBbmRvbm92MCowBQYDK2VwAyEA0IP1y98gPByiIMoph1P0G6cctLb864rNXw1LRLOpXXejgYgwgYUwDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFNo5o+5ea0sNMlW/75VgGJCv2AcJMB8GA1UdIwQYMBaAFN6q1pJW843ndJIW/Ey2ILJrKJhrMCUGA1UdEQQeMByBGnBsYW1lbkBjcnlwdG9yZXZvbHV0aW9uLmJnMAUGAytlcANBAOxPxCDCzt/batCHrDuIMNsZL0lqBpk/dG+MzqseJRS8UjhJsSpOO4jTtsMqS7DWJE64THyIV+FTCbt1XhUM2A4=';
 
-console.log('Lightning Tipping Extension background service worker loaded');
+console.log('ZapArc background service worker loaded');
 
 // Global instances
 const walletManager = new WalletManager();
@@ -298,21 +298,6 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'CHECK_SUFFICIENT_BALANCE':
         const hasSufficientBalance = await walletManager.hasSufficientBalance(message.amount);
         sendResponse({ success: true, hasSufficientBalance });
-        break;
-
-      case 'PARSE_TIP_REQUEST':
-        const tipData = lnurlManager.parseTipRequest(message.tipString);
-        sendResponse({ success: true, tipData });
-        break;
-
-      case 'GENERATE_TIP_REQUEST':
-        const tipRequest = lnurlManager.generateTipRequest(message.lnurl, message.amounts);
-        sendResponse({ success: true, tipRequest });
-        break;
-
-      case 'GENERATE_USER_TIP_REQUEST':
-        const userTipRequest = await lnurlManager.generateUserTipRequest(message.amounts);
-        sendResponse({ success: true, tipRequest: userTipRequest });
         break;
 
       case 'GET_LNURL_PAYMENT_LIMITS':

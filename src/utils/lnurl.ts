@@ -1,4 +1,4 @@
-// LNURL utilities for Lightning Network Tipping Extension
+// LNURL utilities for ZapArc wallet extension
 // Handles LNURL parsing, validation, and operations using Breez SDK
 
 import { WalletManager } from './wallet-manager';
@@ -73,13 +73,6 @@ export interface LnurlPayResponse {
     message?: string;
     url?: string;
   };
-}
-
-export interface TipRequestData {
-  lnurl: string;
-  suggestedAmounts: [number, number, number];
-  isValid: boolean;
-  error?: string;
 }
 
 export class LnurlManager {
@@ -170,116 +163,6 @@ export class LnurlManager {
     } catch (error) {
       console.error('LNURL generation failed:', error);
       throw new Error(`LNURL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Parse tip request string and extract LNURL and amounts
-   */
-  parseTipRequest(tipString: string): TipRequestData {
-    try {
-      // Match the standardized tip format: [lntip:lnurl:<lnurl>:<amount1>:<amount2>:<amount3>]
-      const tipRegex = /\[lntip:lnurl:([^:]+):(\d+):(\d+):(\d+)\]/;
-      const match = tipString.match(tipRegex);
-
-      if (!match) {
-        return {
-          lnurl: '',
-          suggestedAmounts: [0, 0, 0],
-          isValid: false,
-          error: 'Invalid tip request format'
-        };
-      }
-
-      const [, lnurl, amount1, amount2, amount3] = match;
-      const suggestedAmounts: [number, number, number] = [
-        parseInt(amount1),
-        parseInt(amount2),
-        parseInt(amount3)
-      ];
-
-      // Validate LNURL format
-      if (!this.isValidLnurlFormat(lnurl)) {
-        return {
-          lnurl,
-          suggestedAmounts,
-          isValid: false,
-          error: 'Invalid LNURL format'
-        };
-      }
-
-      // Validate amounts
-      if (suggestedAmounts.some(amount => amount <= 0 || !Number.isInteger(amount))) {
-        return {
-          lnurl,
-          suggestedAmounts,
-          isValid: false,
-          error: 'Invalid suggested amounts'
-        };
-      }
-
-      return {
-        lnurl,
-        suggestedAmounts,
-        isValid: true
-      };
-    } catch (error) {
-      console.error('Tip request parsing failed:', error);
-      return {
-        lnurl: '',
-        suggestedAmounts: [0, 0, 0],
-        isValid: false,
-        error: 'Failed to parse tip request'
-      };
-    }
-  }
-
-  /**
-   * Generate standardized tip request string
-   */
-  generateTipRequest(lnurl: string, amounts: [number, number, number]): string {
-    try {
-      // Validate inputs
-      if (!this.isValidLnurlFormat(lnurl)) {
-        throw new Error('Invalid LNURL format');
-      }
-
-      if (amounts.some(amount => amount <= 0 || !Number.isInteger(amount))) {
-        throw new Error('Invalid amounts - must be positive integers');
-      }
-
-      // Generate standardized format
-      return `[lntip:lnurl:${lnurl}:${amounts[0]}:${amounts[1]}:${amounts[2]}]`;
-    } catch (error) {
-      console.error('Tip request generation failed:', error);
-      throw new Error(`Tip request generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Generate tip request string for user's wallet
-   */
-  async generateUserTipRequest(amounts?: [number, number, number]): Promise<string> {
-    try {
-      // Get user's LNURL
-      const settings = await this.walletManager.getStorageManager().getUserSettings();
-      let lnurl: string;
-
-      if (settings.customLNURL) {
-        lnurl = settings.customLNURL;
-      } else if (settings.useBuiltInWallet) {
-        lnurl = await this.generateReceiveLnurl();
-      } else {
-        throw new Error('No LNURL configured. Please set up wallet or provide custom LNURL.');
-      }
-
-      // Use provided amounts or default posting amounts
-      const tipAmounts = amounts || settings.defaultPostingAmounts;
-
-      return this.generateTipRequest(lnurl, tipAmounts);
-    } catch (error) {
-      console.error('User tip request generation failed:', error);
-      throw new Error(`User tip request generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

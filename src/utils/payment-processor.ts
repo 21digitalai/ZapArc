@@ -1,9 +1,7 @@
-// Payment Processor for Lightning Network Tipping Extension
+// Payment Processor for ZapArc wallet payments
 // Handles payment workflows, status tracking, error handling, and retry mechanisms
 
 import { ExtensionMessaging, MessageResponse } from './messaging';
-import { TipRequest, UserSettings, Transaction } from '../types';
-import { TippingUI } from './tipping-ui';
 import { convertToLnurl, isLightningAddress } from './lnurl';
 
 export interface PaymentOptions {

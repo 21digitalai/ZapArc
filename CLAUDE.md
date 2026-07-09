@@ -1,122 +1,18 @@
-# CLAUDE.md - Lightning Tipping Extension
+# CLAUDE.md - ZapArc
 
-This file provides guidance to Claude Code when working with this browser extension.
+ZapArc is a Chrome/Chromium MV3 extension for a self-custodial Bitcoin wallet
+with Lightning and on-chain support.
 
-## Project Context
+## Development
 
-**Lightning Tipping Extension (Tipmaster)** - Chrome extension for non-custodial Bitcoin tipping via Lightning Network.
+- Run `npm run type-check` before handoff.
+- Run `npm test` for the Vitest suite.
+- Run `npm run build` for production extension verification.
+- Load unpacked from `dist/` for browser QA.
 
-**Tech Stack**: TypeScript, Webpack, Chrome Extension APIs (MV3), Breez SDK Spark, LNURL
+## Architecture
 
-**Key Files**:
-- `src/background/background.ts` - Service worker, central coordinator
-- `src/utils/wallet-manager.ts` - Wallet state, encryption, PIN
-- `src/utils/breez-sdk.ts` - Lightning Network connectivity
-- `src/utils/payment-processor.ts` - Payment flow logic
-- `.kiro/specs/lightning-tipping-extension/` - Kiro specifications
-
-## Documentation Structure
-
-**This file (CLAUDE.md)**: Always loaded - contains core principles. Keep it concise.
-
-**Detailed Guides** (Referenced, not loaded - consult when needed):
-- `.claude/docs/CODE_PRINCIPLES.md` - Code quality standards (hard limits, patterns)
-- `.claude/docs/FILE_PRINCIPLES.md` - File organization (structure, naming)
-- `.claude/docs/AGENT_GUIDE.md` - Base patterns for agent delegation
-- `.claude/docs/ARCHITECTURE_GUIDE.md` - Project architecture and patterns
-- `.claude/docs/KIRO_TASK_EXECUTION_GUIDE.md` - Development workflow for Kiro specs
-- `.claude/docs/DELEGATE_GUIDE.md` - Agent delegation strategies
-- `.claude/docs/DEBUG_GUIDE.md` - Systematic debugging methodologies
-
-## Available Commands
-
-- `/start` - Load essential project context (principles, architecture)
-- `/spec` - Create comprehensive strategic plan for complex features, saved to .claude/specs/
-- `/delegate` - Delegate tasks to agents, keeping context clean
-- `/orchestrate` - Full workflow: analyze → implement → test → document → review
-- `/debug` - First-principles debugging for complex issues
-- `/commit` - Smart git commits with logical grouping
-- `/docs-update` - Analyze and update documentation
-- `/test` - Create QA test request documents
-- `/kiro` - Execute tasks from Kiro implementation plans
-- `/kiro-create` - Create a new Kiro spec (requirements.md, design.md, tasks.md)
-- `/kiro-review` - Review completed Kiro tasks against specifications
-
-## Core Principles
-
-### Ask Before Assuming
-
-- **When instructions are ambiguous**: Ask for clarification rather than assuming
-- **When multiple interpretations possible**: Request specific details
-- **When requirements seem incomplete**: Ask about missing details
-- **Better to ask than sorry**: Clarify first, implement second
-
-### Code Quality (See CODE_PRINCIPLES.md for details)
-
-| Rule | Limit |
-|------|-------|
-| Function length | Max 50 lines |
-| Parameters | Max 4 (use object for more) |
-| Nesting depth | Max 4 levels |
-| File length | Max 300 lines |
-
-### File Organization (See FILE_PRINCIPLES.md for details)
-
-- One responsibility per file
-- Group by feature, not type
-- Consistent naming conventions
-- Temp files in designated directory only
-
-## Available Expert Agents
-
-See `.claude/docs/DELEGATE_GUIDE.md` for detailed usage patterns.
-
-| Agent | Purpose | When to Use |
-|-------|---------|-------------|
-| `strategic-planner` | Implementation planning | Start of complex features |
-| `senior-dev-consultant` | Expert advice | Architecture decisions, complex debugging |
-| `senior-dev-implementer` | Production code | Complex features needing senior-level quality |
-| `task-completion-validator` | Verify completeness | Before marking tasks done |
-| `investigator` | Deep research | Bug investigation, API research |
-| `codebase-analyzer` | Understand structure | Before adding new modules |
-| `docs-explorer` | Documentation research | Library/API documentation lookup |
-| `test-generator` | Create test suites | After implementing features |
-| `docs-maintainer` | Update documentation | After significant changes |
-
-**Quick Reference**:
-- Use `codebase-analyzer` instead of opening many files
-- Use `docs-explorer` instead of loading extensive docs
-- Run multiple agents in parallel when tasks are independent
-
-## Documentation Maintenance
-
-After implementing significant changes:
-- Pattern used multiple times → Update architecture guide
-- Bug fixed with learnings → Document in debugging guide
-- New conventions emerge → Update relevant guides
-
-Run `/docs-update check` to analyze if documentation needs updating.
-
-## Build Commands
-
-```bash
-npm run dev        # Development with watch
-npm run build      # Production build
-npm run type-check # TypeScript validation
-```
-
-## Project-Specific Notes
-
-**Extension Architecture**:
-- Background script = service worker (central coordinator)
-- Content scripts inject into pages (tip detection, floating menu)
-- Popup/Settings = separate HTML pages with their own scripts
-- Use Chrome messaging API for cross-component communication
-
-**Tip Format**: `[lntip:lnurl:<LNURL>:<amt1>:<amt2>:<amt3>]`
-
-**Testing**: Load unpacked from `dist/`, use `test.html` for tip detection
-
-## Continuous Improvement
-
-This document should evolve with the project. Update these guidelines when you discover new patterns, anti-patterns, or better approaches.
+- Breez SDK code lives in the popup context because MV3 service workers cannot
+  run the required WASM runtime.
+- Background code handles storage, alarms, and message routing.
+- Content script code is currently reserved for future page integrations.

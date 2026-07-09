@@ -11,7 +11,7 @@ These icons will be used for:
 - Extension management page (48px)
 - Chrome Web Store (128px)
 
-The icons should represent the Lightning Network tipping functionality, 
+The icons should represent ZapArc wallet functionality,
 possibly incorporating lightning bolt and Bitcoin symbols.
 
 ## Source of truth (important)
