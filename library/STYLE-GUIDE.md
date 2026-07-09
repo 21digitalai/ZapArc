@@ -107,4 +107,8 @@
 
 `.save-contact-copy` — stacked prompt title and truncated recipient address inside `.save-contact-prompt`.
 
+`.save-contact-address` — recipient text in the save-contact prompt; keep it truncation-safe.
+
 `.save-contact-actions` — right-aligned Cancel/Save actions for the save-contact prompt.
+
+`.save-contact-cancel`, `.save-contact-save` — semantic anchors for the prompt action buttons; compose with shared button utility classes.
