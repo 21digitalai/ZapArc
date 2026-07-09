@@ -85,4 +85,4 @@ Also supports metadata:
 
 ## License
 
-Private — All rights reserved.
+MIT. See [LICENSE](LICENSE).
