@@ -77,6 +77,7 @@ import {
     handlePaymentReceivedFromSDK
 } from './deposit';
 import { getClaimKey, getProvisionalClaims, mergeClaimRows, removeProvisionalClaim } from './onchain-claim-lifecycle';
+import { extractLnurlPaymentComment, loadPaymentComment, shouldShowPaymentComment } from './payment-comment';
 
 // Withdrawal imports
 import {
@@ -147,6 +148,7 @@ interface StoredTransaction {
     claimStatus?: 'confirming' | 'claiming' | 'retrying' | 'too-small';
     claimMessage?: string;
     requiredConfirmations?: number;
+    comment?: string;
 }
 
 let storedTransactions: StoredTransaction[] = [];
@@ -597,7 +599,10 @@ async function loadTransactionHistory() {
         );
 
         // Store full transaction data for detail view
-        storedTransactions = sortedPayments.map((payment: any, index: number) => {
+        const walletContext = JSON.parse((await chrome.storage.local.get(['multiWalletData'])).multiWalletData || '{}');
+        const commentWalletId = walletContext.activeWalletId || null;
+        const commentSubWalletIndex = Number(walletContext.activeSubWalletIndex || 0);
+        storedTransactions = await Promise.all(sortedPayments.map(async (payment: any, index: number) => {
             const isReceive = payment.paymentType === 'receive';
             const method = payment.method || payment.paymentMethod?.type || payment.details?.type || undefined;
             const confirmations =
@@ -627,6 +632,7 @@ async function loadTransactionHistory() {
                 }
             }
 
+            const senderComment = await loadPaymentComment(commentWalletId, commentSubWalletIndex, payment.id);
             return {
                 id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
@@ -643,8 +649,9 @@ async function loadTransactionHistory() {
                 txid: payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
                 confirmations: typeof confirmations === 'number' ? confirmations : undefined,
                 vout: typeof (payment.details?.vout ?? payment.vout) === 'number' ? (payment.details?.vout ?? payment.vout) : undefined,
+                comment: senderComment || extractLnurlPaymentComment(payment),
             } as StoredTransaction;
-        });
+        }));
 
         const completedClaimKeys = new Set<string>();
         storedTransactions.forEach((transaction) => {
@@ -858,6 +865,10 @@ function showTransactionDetail(tx: StoredTransaction): void {
                 <span class="tx-detail-value">${escapeHtml(tx.description)}</span>
             </div>
         `;
+    }
+
+    if (shouldShowPaymentComment(tx.description, tx.comment)) {
+        detailRows += `<div class="tx-detail-row"><span class="tx-detail-label">Comment</span><span class="tx-detail-value">${escapeHtml(tx.comment || '')}</span></div>`;
     }
 
     if (tx.feeSats !== undefined && tx.feeSats > 0) {

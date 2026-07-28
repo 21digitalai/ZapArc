@@ -752,8 +752,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Note</label>
-                        <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
+                        <label>Comment</label>
+                        <input type="text" id="withdrawal-comment" placeholder="Saved with payment; delivered to LNURL-pay recipients" maxlength="144">
                     </div>
 
                     <div class="payment-preview hidden" id="payment-preview">
@@ -773,6 +773,10 @@
                         <div class="payment-preview-row payment-preview-total">
                             <span>Total:</span>
                             <strong id="preview-total" class="payment-preview-value amount"></strong>
+                        </div>
+                        <div class="payment-preview-row hidden" id="preview-comment-row">
+                            <span>Comment:</span>
+                            <strong id="preview-comment" class="payment-preview-value"></strong>
                         </div>
                     </div>
 

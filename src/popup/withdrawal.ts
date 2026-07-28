@@ -12,6 +12,7 @@ import { isExistingContact, openContactModalWithAddress, openContactPicker, show
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
+import { savePaymentComment } from './payment-comment';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -749,6 +750,9 @@ export async function previewPayment(): Promise<void> {
 
             const commentInput = document.getElementById('withdrawal-comment') as HTMLInputElement;
             const comment = commentInput?.value?.trim() || undefined;
+            const allowed = Number(payRequest.commentAllowed || 0);
+            if (comment && (!Number.isFinite(allowed) || allowed <= 0)) throw new Error('This recipient does not accept comments. Remove the comment to continue.');
+            if (comment && comment.length > allowed) throw new Error(`Comment is too long. This recipient accepts up to ${allowed} characters.`);
 
             const prepareResponse = await breezSDK.prepareLnurlPay({
                 amountSats: amount,
@@ -783,12 +787,19 @@ export function displayPaymentPreview(previewData: any): void {
     const amountEl = document.getElementById('preview-amount');
     const feeEl = document.getElementById('preview-fee');
     const totalEl = document.getElementById('preview-total');
+    const commentRow = document.getElementById('preview-comment-row');
+    const commentEl = document.getElementById('preview-comment');
 
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
     const total = previewData.amount + previewData.fee;
     setPreviewAmount(amountEl, previewData.amount);
     setPreviewAmount(feeEl, previewData.fee);
     setPreviewAmount(totalEl, total);
+    const comment = (document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value.trim() || '';
+    if (commentRow && commentEl) {
+        commentEl.textContent = comment;
+        commentRow.classList.toggle('hidden', !comment);
+    }
 
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
@@ -843,6 +854,7 @@ export async function sendPayment(): Promise<void> {
     if (!confirmed) return;
 
     const recipientAtSend = paymentInput.value.trim();
+    const commentAtSend = (document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value.trim();
     console.log('[Withdrawal] Recipient captured for post-payment contact prompt', recipientAtSend);
 
     paymentSendInProgress = true;
@@ -907,6 +919,11 @@ export async function sendPayment(): Promise<void> {
             ? result?.payment?.status
             : sendResult?.payment?.status;
         const isPending = typeof finalStatus === 'string' && finalStatus === 'pending';
+        const completedPayment = isLnurlPayment ? result?.payment : sendResult?.payment;
+        if (commentAtSend && completedPayment?.id) {
+            const wallet = JSON.parse((await chrome.storage.local.get(['multiWalletData'])).multiWalletData || '{}');
+            await savePaymentComment(wallet.activeWalletId || null, Number(wallet.activeSubWalletIndex || 0), completedPayment.id, commentAtSend);
+        }
         if (isPending) {
             const pendingPayment = isLnurlPayment ? result?.payment : sendResult?.payment;
             const pendingLog = {
