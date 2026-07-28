@@ -40,3 +40,8 @@ export function renderPaymentCommentDetailRow(comment: unknown, escapeHtml: (val
     if (!value) return '';
     return `<div class="tx-detail-row"><span class="tx-detail-label">Comment</span><span class="tx-detail-value">${escapeHtml(value)}</span></div>`;
 }
+
+/** This renderer is used by both recent and history transaction detail views. */
+export function renderTransactionCommentDetailRow(description: unknown, comment: unknown, escapeHtml: (value: string) => string): string {
+    return shouldShowPaymentComment(description, comment) ? renderPaymentCommentDetailRow(comment, escapeHtml) : '';
+}

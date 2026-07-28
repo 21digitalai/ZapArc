@@ -77,7 +77,7 @@ import {
     handlePaymentReceivedFromSDK
 } from './deposit';
 import { getClaimKey, getProvisionalClaims, mergeClaimRows, removeProvisionalClaim } from './onchain-claim-lifecycle';
-import { extractLnurlPaymentComment, loadPaymentComment, renderPaymentCommentDetailRow } from './payment-comment';
+import { extractLnurlPaymentComment, loadPaymentComment, renderTransactionCommentDetailRow } from './payment-comment';
 
 // Withdrawal imports
 import {
@@ -867,9 +867,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
         `;
     }
 
-    if (tx.comment && tx.comment.trim() !== (tx.description || '').trim()) {
-        detailRows += renderPaymentCommentDetailRow(tx.comment, escapeHtml);
-    }
+    detailRows += renderTransactionCommentDetailRow(tx.description, tx.comment, escapeHtml);
 
     if (tx.feeSats !== undefined && tx.feeSats > 0) {
         detailRows += `

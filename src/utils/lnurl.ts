@@ -126,8 +126,14 @@ export class LnurlManager {
         throw new Error(`Amount must be between ${payData.minSendable / 1000} and ${payData.maxSendable / 1000} sats`);
       }
 
-      // Validate comment length if provided
-      if (comment && payData.commentAllowed && comment.length > payData.commentAllowed) {
+      // LUD-12 only permits a nonblank comment when the recipient explicitly
+      // advertises a positive limit. Do not forward unsupported comments.
+      const hasComment = typeof comment === 'string' && comment.trim().length > 0;
+      const allowed = Number(payData.commentAllowed || 0);
+      if (hasComment && (!Number.isFinite(allowed) || allowed <= 0)) {
+        throw new Error('This recipient does not accept comments. Remove the comment to continue.');
+      }
+      if (hasComment && comment!.length > allowed) {
         throw new Error(`Comment too long. Maximum ${payData.commentAllowed} characters allowed`);
       }
 
@@ -141,7 +147,7 @@ export class LnurlManager {
       }
 
       // Execute payment and wait for confirmation
-      const result = await this.walletManager.payLnurl(reqData.data, amount, comment);
+      const result = await this.walletManager.payLnurl(reqData.data, amount, hasComment ? comment : undefined);
 
       return result;
     } catch (error) {
