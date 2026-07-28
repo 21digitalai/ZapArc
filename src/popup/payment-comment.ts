@@ -11,10 +11,11 @@ export function nonblankPaymentComment(value: unknown): string | undefined {
 }
 
 /**
- * A LNURL comment is part of the prepared callback request. Persist that value
- * after payment rather than rereading an editable composer field at send time.
+ * Comments are captured at Preview and persisted after payment rather than
+ * rereading an editable composer field at send time. LNURL delivery is handled
+ * separately; local history keeps the sender's approved value for every path.
  */
-export function preparedLnurlPaymentComment(value: unknown): string | undefined {
+export function preparedPaymentComment(value: unknown): string | undefined {
     return cleanComment(value);
 }
 

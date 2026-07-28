@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { extractLnurlPaymentComment, loadPaymentComment, nonblankPaymentComment, paymentCommentKey, preparedLnurlPaymentComment, renderTransactionCommentDetailRow, savePaymentComment, shouldShowPaymentComment } from './payment-comment';
+import { extractLnurlPaymentComment, loadPaymentComment, nonblankPaymentComment, paymentCommentKey, preparedPaymentComment, renderTransactionCommentDetailRow, savePaymentComment, shouldShowPaymentComment } from './payment-comment';
 
 describe('payment comments', () => {
     it('uses a wallet-scoped stable payment identity', () => {
@@ -41,11 +41,28 @@ describe('payment comments', () => {
         expect(nonblankPaymentComment('   ')).toBeUndefined();
     });
 
-    it('persists the comment captured by LNURL preview after the composer is edited', () => {
-        const preparedComment = preparedLnurlPaymentComment('comment delivered in preview');
+    it('persists the comment captured by preview after the composer is edited', async () => {
+        const storage: Record<string, string> = {};
+        vi.stubGlobal('chrome', {
+            storage: {
+                local: {
+                    set: vi.fn(async (values: Record<string, string>) => Object.assign(storage, values)),
+                    get: vi.fn(async (keys: string[]) => Object.fromEntries(keys.filter(key => key in storage).map(key => [key, storage[key]])))
+                }
+            }
+        });
+        const preparedComment = preparedPaymentComment('comment delivered in preview');
         const composerValueAfterPreview = 'later composer edit';
 
         expect(preparedComment).toBe('comment delivered in preview');
         expect(preparedComment).not.toBe(composerValueAfterPreview);
+        await savePaymentComment('wallet-a', 2, 'completed-payment', preparedComment);
+        const reloadedComment = await loadPaymentComment('wallet-a', 2, 'completed-payment');
+        const html = renderTransactionCommentDetailRow('Provider description', reloadedComment, value => value);
+
+        expect(html).toContain('Comment');
+        expect(html).toContain('comment delivered in preview');
+        expect(html).not.toContain(composerValueAfterPreview);
+        vi.unstubAllGlobals();
     });
 });
