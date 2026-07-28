@@ -11,6 +11,20 @@ export type ClaimRow = {
     requiredConfirmations?: number;
 };
 
+const provisionalClaims = new Map<string, ClaimRow>();
+
+export function upsertProvisionalClaim(row: ClaimRow): void {
+    provisionalClaims.set(row.key, row);
+}
+
+export function removeProvisionalClaim(key: string): void {
+    provisionalClaims.delete(key);
+}
+
+export function getProvisionalClaims(): ClaimRow[] {
+    return Array.from(provisionalClaims.values());
+}
+
 function sdkErrorMessage(value: unknown, depth = 0, seen = new Set<object>()): string | undefined {
     if (typeof value === 'string' && value.trim()) return value.trim();
     if (!value || typeof value !== 'object' || depth > 5 || seen.has(value)) return undefined;

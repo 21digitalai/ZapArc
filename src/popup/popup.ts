@@ -76,6 +76,7 @@ import {
     setDepositCallbacks,
     handlePaymentReceivedFromSDK
 } from './deposit';
+import { getClaimKey, getProvisionalClaims, mergeClaimRows, removeProvisionalClaim } from './onchain-claim-lifecycle';
 
 // Withdrawal imports
 import {
@@ -141,7 +142,11 @@ interface StoredTransaction {
     preimage?: string;
     bolt11?: string;
     txid?: string;
+    vout?: number;
     confirmations?: number;
+    claimStatus?: 'confirming' | 'claiming' | 'retrying' | 'too-small';
+    claimMessage?: string;
+    requiredConfirmations?: number;
 }
 
 let storedTransactions: StoredTransaction[] = [];
@@ -564,7 +569,7 @@ async function loadTransactionHistory() {
         console.warn(`🧾 [Support] Full payment dump count: ${supportDump.length}/${payments.length}`);
         console.warn('🧾 [Support] Payment debug dump:\n' + JSON.stringify(supportDump, null, 2));
 
-        if (payments.length === 0) {
+        if (payments.length === 0 && getProvisionalClaims().length === 0) {
             transactionList.innerHTML = getTransactionEmptyStateHtml();
             storedTransactions = [];
 
@@ -637,8 +642,33 @@ async function loadTransactionHistory() {
                 bolt11: payment.bolt11 || payment.details?.bolt11 || undefined,
                 txid: payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
                 confirmations: typeof confirmations === 'number' ? confirmations : undefined,
+                vout: typeof (payment.details?.vout ?? payment.vout) === 'number' ? (payment.details?.vout ?? payment.vout) : undefined,
             } as StoredTransaction;
         });
+
+        const completedClaimKeys = new Set<string>();
+        storedTransactions.forEach((transaction) => {
+            if (transaction.txid && transaction.vout !== undefined) {
+                completedClaimKeys.add(getClaimKey(transaction.txid, transaction.vout));
+            }
+        });
+        mergeClaimRows(getProvisionalClaims(), completedClaimKeys).forEach((claim) => {
+            storedTransactions.unshift({
+                id: `claim-${claim.key}`,
+                type: 'receive',
+                amount: claim.amountSats,
+                timestamp: Date.now(),
+                status: 'pending',
+                method: 'deposit',
+                txid: claim.txid,
+                vout: claim.vout,
+                confirmations: claim.confirmations,
+                requiredConfirmations: claim.requiredConfirmations,
+                claimStatus: claim.status === 'claimed' ? 'claiming' : claim.status,
+                claimMessage: claim.message,
+            });
+        });
+        completedClaimKeys.forEach(removeProvisionalClaim);
 
         // Cache for faster loading (wallet-specific)
         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
@@ -683,6 +713,13 @@ function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): b
 }
 
 function getTransactionStatus(tx: StoredTransaction): { label: string; className: string } {
+    if (tx.claimStatus === 'too-small') return { label: 'Too small to claim', className: 'tx-status-failed' };
+    if (tx.claimStatus === 'retrying') return { label: 'Retrying', className: 'tx-status-pending' };
+    if (tx.claimStatus === 'claiming') return { label: 'Claiming', className: 'tx-status-pending' };
+    if (tx.claimStatus === 'confirming') {
+        const progress = tx.confirmations !== undefined ? ` ${tx.confirmations}/${tx.requiredConfirmations || 3}` : '';
+        return { label: `Confirming${progress}`, className: 'tx-status-pending' };
+    }
     const status = (tx.status || '').toLowerCase();
     if (status === 'failed' || status === 'error') return { label: 'Failed', className: 'tx-status-failed' };
     if (status.includes('complete') || status.includes('success')) return { label: '', className: '' };
@@ -772,7 +809,23 @@ function showTransactionDetail(tx: StoredTransaction): void {
     let statusClass = 'completed';
     let statusIcon = '✓';
     let statusText = 'Completed';
-    if (tx.status === 'pending' || tx.status === 'confirming' || tx.status === 'mempool') {
+    if (tx.claimStatus === 'too-small') {
+        statusClass = 'failed';
+        statusIcon = '⚠';
+        statusText = 'Too small to claim';
+    } else if (tx.claimStatus === 'retrying') {
+        statusClass = 'pending';
+        statusIcon = '⏳';
+        statusText = 'Retrying';
+    } else if (tx.claimStatus === 'claiming') {
+        statusClass = 'pending';
+        statusIcon = '⏳';
+        statusText = 'Claiming';
+    } else if (tx.claimStatus === 'confirming') {
+        statusClass = 'pending';
+        statusIcon = '⏳';
+        statusText = tx.confirmations !== undefined ? `Confirming ${tx.confirmations}/${tx.requiredConfirmations || 3}` : 'Confirming';
+    } else if (tx.status === 'pending' || tx.status === 'confirming' || tx.status === 'mempool') {
         statusClass = 'pending';
         statusIcon = '⏳';
         statusText = isOnchain ? 'Confirming' : 'Pending';
@@ -829,7 +882,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
         detailRows += `
             <div class="tx-detail-row">
                 <span class="tx-detail-label">Confirmations</span>
-                <span class="tx-detail-value">${tx.confirmations}</span>
+                <span class="tx-detail-value">${tx.confirmations}${tx.requiredConfirmations ? `/${tx.requiredConfirmations}` : ''}</span>
             </div>
         `;
     }

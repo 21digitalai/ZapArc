@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { classifyClaimError, getClaimKey, mergeClaimRows } from './onchain-claim-lifecycle';
+import {
+    classifyClaimError,
+    getClaimKey,
+    getProvisionalClaims,
+    mergeClaimRows,
+    removeProvisionalClaim,
+    upsertProvisionalClaim,
+} from './onchain-claim-lifecycle';
 
 describe('on-chain claim lifecycle', () => {
     it('keeps nested fee and network failures retryable', () => {
@@ -15,5 +22,15 @@ describe('on-chain claim lifecycle', () => {
     it('deduplicates provisional rows by output identity', () => {
         const key = getClaimKey('tx', 1);
         expect(mergeClaimRows([{ key, txid: 'tx', vout: 1, amountSats: 1, status: 'claiming' }], new Set([key]))).toEqual([]);
+    });
+
+    it('keeps one provisional row per claim output until the completed payment reconciles it', () => {
+        const key = getClaimKey('claim-tx', 2);
+        upsertProvisionalClaim({ key, txid: 'claim-tx', vout: 2, amountSats: 1_234, status: 'confirming' });
+        upsertProvisionalClaim({ key, txid: 'claim-tx', vout: 2, amountSats: 1_234, status: 'retrying' });
+
+        expect(getProvisionalClaims().filter((claim) => claim.key === key)).toHaveLength(1);
+        expect(mergeClaimRows(getProvisionalClaims(), new Set([key]))).not.toContainEqual(expect.objectContaining({ key }));
+        removeProvisionalClaim(key);
     });
 });

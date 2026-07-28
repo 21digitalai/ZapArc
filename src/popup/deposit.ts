@@ -13,7 +13,7 @@ import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getDisplayCurrency } from './currency-pref';
-import { classifyClaimError, getClaimKey } from './onchain-claim-lifecycle';
+import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');
@@ -95,7 +95,14 @@ function setOnchainDepositStatus(message: string): void {
     statusEl.classList.remove('hidden');
 }
 
-const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string; confirmations?: number; requiredConfirmations?: number; failureReason?: string }>();
+const depositClaimResults = new Map<string, ClaimRow>();
+
+async function updateClaimRow(row: ClaimRow): Promise<void> {
+    depositClaimResults.set(row.key, row);
+    upsertProvisionalClaim(row);
+    renderPendingDeposits();
+    await callbacks?.loadTransactionHistory();
+}
 
 
 function escapeHtml(value: string): string {
@@ -124,10 +131,10 @@ function showPendingDepositDetail(key: string): void {
                 ? 'Too small'
                 : 'Confirming';
 
-    const failureRow = deposit.failureReason
+    const failureRow = deposit.message
         ? `<div class="tx-detail-row">
                 <span class="tx-detail-label">Failure reason</span>
-                <span class="tx-detail-value">${escapeHtml(deposit.failureReason)}</span>
+                <span class="tx-detail-value">${escapeHtml(deposit.message)}</span>
             </div>`
         : '';
 
@@ -227,14 +234,15 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
             const key = getClaimKey(deposit.txid, deposit.vout);
             if (claimedOnchainDeposits.has(key)) continue;
 
-            depositClaimResults.set(key, {
+            await updateClaimRow({
+                key,
                 status: depositInfo.isMature === false ? 'confirming' : 'claiming',
                 amountSats: deposit.amountSats,
                 txid: deposit.txid,
+                vout: deposit.vout,
                 confirmations: typeof depositInfo.confirmations === 'number' ? depositInfo.confirmations : undefined,
                 requiredConfirmations: 3,
             });
-            renderPendingDeposits();
 
             if (depositInfo.isMature === false) continue;
 
@@ -245,8 +253,7 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
                     maxFee: { type: 'networkRecommended', leewaySatPerVbyte: 2 }
                 });
                 claimedOnchainDeposits.add(key);
-                depositClaimResults.set(key, { status: 'claimed', amountSats: deposit.amountSats, txid: deposit.txid });
-                renderPendingDeposits();
+                await updateClaimRow({ key, status: 'claimed', amountSats: deposit.amountSats, txid: deposit.txid, vout: deposit.vout });
                 await callbacks?.updateBalanceDisplay();
                 await callbacks?.loadTransactionHistory();
                 showSuccess(`Receive of ${deposit.amountSats.toLocaleString()} sats claimed!`);
@@ -259,15 +266,16 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
             } catch (claimError) {
                 const claimResult = classifyClaimError(claimError, Number(deposit.amountSats));
                 console.warn(`[Deposit] Failed to claim ${key}:`, claimError);
-                depositClaimResults.set(key, {
+                await updateClaimRow({
+                    key,
                     status: claimResult.status,
                     amountSats: deposit.amountSats,
                     txid: deposit.txid,
+                    vout: deposit.vout,
                     confirmations: typeof depositInfo.confirmations === 'number' ? depositInfo.confirmations : undefined,
                     requiredConfirmations: 3,
-                    failureReason: claimResult.message,
+                    message: claimResult.message,
                 });
-                renderPendingDeposits();
             }
         }
 
