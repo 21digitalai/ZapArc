@@ -3,7 +3,11 @@ export function paymentCommentKey(walletId: string, subWalletIndex: number, paym
 }
 
 function cleanComment(value: unknown): string | undefined {
-    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+    return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function nonblankPaymentComment(value: unknown): string | undefined {
+    return cleanComment(value);
 }
 
 export async function savePaymentComment(walletId: string | null, subWalletIndex: number, paymentId: unknown, comment: unknown): Promise<void> {
@@ -21,10 +25,18 @@ export async function loadPaymentComment(walletId: string | null, subWalletIndex
 export function extractLnurlPaymentComment(payment: any): string | undefined {
     const details = payment && payment.details;
     const inner = details && (details.inner || details);
-    return cleanComment(inner && inner.lnurlPayInfo && inner.lnurlPayInfo.comment);
+    const comment = cleanComment(inner && inner.lnurlPayInfo && inner.lnurlPayInfo.comment);
+    return comment ? comment.trim() : undefined;
 }
 
 export function shouldShowPaymentComment(description: unknown, comment: unknown): boolean {
     const value = cleanComment(comment);
-    return !!value && value !== cleanComment(description);
+    const descriptionValue = cleanComment(description);
+    return !!value && value.trim() !== (descriptionValue || '').trim();
+}
+
+export function renderPaymentCommentDetailRow(comment: unknown, escapeHtml: (value: string) => string): string {
+    const value = cleanComment(comment);
+    if (!value) return '';
+    return `<div class="tx-detail-row"><span class="tx-detail-label">Comment</span><span class="tx-detail-value">${escapeHtml(value)}</span></div>`;
 }

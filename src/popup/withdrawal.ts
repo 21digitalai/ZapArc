@@ -12,7 +12,7 @@ import { isExistingContact, openContactModalWithAddress, openContactPicker, show
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
-import { savePaymentComment } from './payment-comment';
+import { nonblankPaymentComment, savePaymentComment } from './payment-comment';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -749,8 +749,15 @@ export async function previewPayment(): Promise<void> {
             if (amount > maxSendableSats) throw new Error(`Amount cannot exceed ${maxSendableSats} sats`);
 
             const commentInput = document.getElementById('withdrawal-comment') as HTMLInputElement;
-            const comment = commentInput?.value?.trim() || undefined;
+            const comment = nonblankPaymentComment(commentInput?.value);
             const allowed = Number(payRequest.commentAllowed || 0);
+            if (commentInput) {
+                if (Number.isFinite(allowed) && allowed > 0) {
+                    commentInput.maxLength = allowed;
+                } else {
+                    commentInput.removeAttribute('maxlength');
+                }
+            }
             if (comment && (!Number.isFinite(allowed) || allowed <= 0)) throw new Error('This recipient does not accept comments. Remove the comment to continue.');
             if (comment && comment.length > allowed) throw new Error(`Comment is too long. This recipient accepts up to ${allowed} characters.`);
 
@@ -795,7 +802,7 @@ export function displayPaymentPreview(previewData: any): void {
     setPreviewAmount(amountEl, previewData.amount);
     setPreviewAmount(feeEl, previewData.fee);
     setPreviewAmount(totalEl, total);
-    const comment = (document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value.trim() || '';
+    const comment = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value) || '';
     if (commentRow && commentEl) {
         commentEl.textContent = comment;
         commentRow.classList.toggle('hidden', !comment);
@@ -854,7 +861,7 @@ export async function sendPayment(): Promise<void> {
     if (!confirmed) return;
 
     const recipientAtSend = paymentInput.value.trim();
-    const commentAtSend = (document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value.trim();
+    const commentAtSend = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value);
     console.log('[Withdrawal] Recipient captured for post-payment contact prompt', recipientAtSend);
 
     paymentSendInProgress = true;

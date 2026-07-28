@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractLnurlPaymentComment, paymentCommentKey, shouldShowPaymentComment } from './payment-comment';
+import { extractLnurlPaymentComment, nonblankPaymentComment, paymentCommentKey, renderPaymentCommentDetailRow, shouldShowPaymentComment } from './payment-comment';
 
 describe('payment comments', () => {
     it('uses a wallet-scoped stable payment identity', () => {
@@ -14,5 +14,18 @@ describe('payment comments', () => {
     it('reads the documented incoming LNURL comment metadata only', () => {
         expect(extractLnurlPaymentComment({ details: { inner: { lnurlPayInfo: { comment: ' Thanks! ' } } } })).toBe('Thanks!');
         expect(extractLnurlPaymentComment({ details: { inner: { lnurlPayInfo: { comment: '   ' } } } })).toBeUndefined();
+    });
+
+    it('renders the exact persisted comment in a transaction detail row after reload', () => {
+        const storedComment = '  exact sender note  ';
+        const html = renderPaymentCommentDetailRow(storedComment, value => value);
+
+        expect(html).toContain('Comment');
+        expect(html).toContain(storedComment);
+    });
+
+    it('preserves the exact nonblank comment for LNURL delivery while omitting blank values', () => {
+        expect(nonblankPaymentComment('  delivered exactly  ')).toBe('  delivered exactly  ');
+        expect(nonblankPaymentComment('   ')).toBeUndefined();
     });
 });
