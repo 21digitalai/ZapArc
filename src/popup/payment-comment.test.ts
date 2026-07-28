@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { extractLnurlPaymentComment, loadPaymentComment, nonblankPaymentComment, paymentCommentKey, renderTransactionCommentDetailRow, savePaymentComment, shouldShowPaymentComment } from './payment-comment';
+import { extractLnurlPaymentComment, loadPaymentComment, nonblankPaymentComment, paymentCommentKey, preparedLnurlPaymentComment, renderTransactionCommentDetailRow, savePaymentComment, shouldShowPaymentComment } from './payment-comment';
 
 describe('payment comments', () => {
     it('uses a wallet-scoped stable payment identity', () => {
@@ -39,5 +39,13 @@ describe('payment comments', () => {
     it('preserves the exact nonblank comment for LNURL delivery while omitting blank values', () => {
         expect(nonblankPaymentComment('  delivered exactly  ')).toBe('  delivered exactly  ');
         expect(nonblankPaymentComment('   ')).toBeUndefined();
+    });
+
+    it('persists the comment captured by LNURL preview after the composer is edited', () => {
+        const preparedComment = preparedLnurlPaymentComment('comment delivered in preview');
+        const composerValueAfterPreview = 'later composer edit';
+
+        expect(preparedComment).toBe('comment delivered in preview');
+        expect(preparedComment).not.toBe(composerValueAfterPreview);
     });
 });

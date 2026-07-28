@@ -10,6 +10,14 @@ export function nonblankPaymentComment(value: unknown): string | undefined {
     return cleanComment(value);
 }
 
+/**
+ * A LNURL comment is part of the prepared callback request. Persist that value
+ * after payment rather than rereading an editable composer field at send time.
+ */
+export function preparedLnurlPaymentComment(value: unknown): string | undefined {
+    return cleanComment(value);
+}
+
 export async function savePaymentComment(walletId: string | null, subWalletIndex: number, paymentId: unknown, comment: unknown): Promise<void> {
     const value = cleanComment(comment);
     if (!walletId || typeof paymentId !== 'string' || !value) return;

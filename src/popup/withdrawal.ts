@@ -12,7 +12,7 @@ import { isExistingContact, openContactModalWithAddress, openContactPicker, show
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
-import { nonblankPaymentComment, savePaymentComment } from './payment-comment';
+import { nonblankPaymentComment, preparedLnurlPaymentComment, savePaymentComment } from './payment-comment';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -28,6 +28,7 @@ let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
 let dismissedSaveContactAddress: string | null = null;
 let paymentSendInProgress = false;
 let saveContactPromptRequestId = 0;
+let preparedLnurlComment: string | undefined;
 
 // Currency toggle state for send amount input
 let sendInputCurrency: DisplayCurrency = 'sats';
@@ -240,6 +241,7 @@ export function hideWithdrawInterface(): void {
 
     resetWithdrawForm();
     setPreparedPayment(null);
+    preparedLnurlComment = undefined;
 }
 
 function setSendTab(tab: 'lightning' | 'onchain'): void {
@@ -274,6 +276,7 @@ export function resetWithdrawForm(): void {
         amountInput.placeholder = '';
     }
     if (commentInput) commentInput.value = '';
+    preparedLnurlComment = undefined;
     previewDiv?.classList.add('hidden');
     hideSaveContactPrompt();
     dismissedSaveContactAddress = null;
@@ -706,6 +709,7 @@ export async function previewPayment(): Promise<void> {
             });
 
             setPreparedPayment(prepared);
+            preparedLnurlComment = undefined;
             const prepFee = prepared.paymentMethod?.type === 'bolt11Invoice' 
                 ? Number(prepared.paymentMethod.lightningFeeSats || 0) 
                 : 0;
@@ -769,6 +773,7 @@ export async function previewPayment(): Promise<void> {
             });
 
             setPreparedPayment(prepareResponse);
+            preparedLnurlComment = preparedLnurlPaymentComment(comment);
             displayPaymentPreview({
                 recipient: input,
                 amount,
@@ -861,7 +866,6 @@ export async function sendPayment(): Promise<void> {
     if (!confirmed) return;
 
     const recipientAtSend = paymentInput.value.trim();
-    const commentAtSend = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value);
     console.log('[Withdrawal] Recipient captured for post-payment contact prompt', recipientAtSend);
 
     paymentSendInProgress = true;
@@ -885,6 +889,7 @@ export async function sendPayment(): Promise<void> {
         }
 
         const isLnurlPayment = preparedPayment && 'feeSats' in preparedPayment && 'payRequest' in preparedPayment;
+        const commentAtSend = isLnurlPayment ? preparedLnurlComment : undefined;
         let result: any;
         let sendResult: any;
 
@@ -918,6 +923,7 @@ export async function sendPayment(): Promise<void> {
         }
 
         setPreparedPayment(null);
+        preparedLnurlComment = undefined;
 
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
 
