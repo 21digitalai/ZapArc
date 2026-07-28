@@ -17,6 +17,7 @@ import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
 import { hideBalanceLoading } from './ui-helpers';
 import { showSuccess, showInfo } from './notifications';
 import * as bip39 from 'bip39';
+import { classifyClaimError, getClaimKey } from './onchain-claim-lifecycle';
 
 // BIP39 wordlist for sub-wallet derivation
 const BIP39_WORDLIST = bip39.wordlists.english;
@@ -78,12 +79,8 @@ async function checkSparkStatusAndWarn(): Promise<void> {
     }
 }
 
-function getDepositKey(txid: string, vout: number): string {
-    return `${txid}:${vout}`;
-}
-
 async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Promise<void> {
-    const key = getDepositKey(txid, vout);
+    const key = getClaimKey(txid, vout);
     if (claimedDepositKeys.has(key)) {
         return;
     }
@@ -98,13 +95,12 @@ async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Pr
         claimedDepositKeys.add(key);
         console.log(`✅ [Breez-SDK] Claimed deposit ${key}, result:`, JSON.stringify(result));
     } catch (error) {
-        claimedDepositKeys.add(key); // Don't retry endlessly
-        const errMsg = error instanceof Error ? error.message : String(error);
-        const isDust = errMsg.includes('dust') || errMsg.includes('less than');
-        if (isDust) {
+        const claimResult = classifyClaimError(error, Number.MAX_SAFE_INTEGER);
+        if (claimResult.status === 'too-small') {
+            claimedDepositKeys.add(key);
             console.warn(`⚠️ [Breez-SDK] Deposit ${key} too small to claim (below dust threshold after fees)`);
         } else {
-            console.error(`❌ [Breez-SDK] Failed to claim deposit ${key}:`, error);
+            console.warn(`⏳ [Breez-SDK] Claim ${key} remains retryable: ${claimResult.message}`);
         }
     }
 }

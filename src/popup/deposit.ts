@@ -13,6 +13,7 @@ import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getDisplayCurrency } from './currency-pref';
+import { classifyClaimError, getClaimKey } from './onchain-claim-lifecycle';
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');
@@ -94,8 +95,7 @@ function setOnchainDepositStatus(message: string): void {
     statusEl.classList.remove('hidden');
 }
 
-// Track deposit claim results: 'claiming' | 'claimed' | 'too-small' | 'failed'
-const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string; failureReason?: string }>();
+const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string; confirmations?: number; requiredConfirmations?: number; failureReason?: string }>();
 
 
 function escapeHtml(value: string): string {
@@ -118,9 +118,11 @@ function showPendingDepositDetail(key: string): void {
         ? 'Claiming'
         : deposit.status === 'claimed'
             ? 'Claimed'
-            : deposit.status === 'too-small'
+                : deposit.status === 'retrying'
+                    ? 'Retrying'
+                    : deposit.status === 'too-small'
                 ? 'Too small'
-                : 'Failed';
+                : 'Confirming';
 
     const failureRow = deposit.failureReason
         ? `<div class="tx-detail-row">
@@ -132,13 +134,14 @@ function showPendingDepositDetail(key: string): void {
     content.innerHTML = `
         <div class="tx-detail-amount-section">
             <div class="tx-detail-amount positive">${deposit.amountSats.toLocaleString()} sats</div>
-            <div class="tx-detail-status ${deposit.status === 'failed' ? 'failed' : deposit.status === 'too-small' ? 'pending' : 'completed'}">${statusLabel}</div>
+            <div class="tx-detail-status ${deposit.status === 'too-small' ? 'pending' : deposit.status === 'claimed' ? 'completed' : 'pending'}">${statusLabel}</div>
         </div>
         <div class="tx-detail-rows">
             <div class="tx-detail-row">
                 <span class="tx-detail-label">Transaction ID</span>
                 <span class="tx-detail-value">${escapeHtml(deposit.txid)}</span>
             </div>
+            ${deposit.confirmations !== undefined ? `<div class="tx-detail-row"><span class="tx-detail-label">Confirmations</span><span class="tx-detail-value">${deposit.confirmations}/${deposit.requiredConfirmations || 3}</span></div>` : ''}
             ${failureRow}
         </div>`;
 
@@ -170,13 +173,17 @@ function renderPendingDeposits(): void {
                 statusText = '✅ Claimed';
                 statusClass = 'claimed';
                 break;
+            case 'retrying':
+                statusText = '⏳ Retrying';
+                statusClass = 'claiming';
+                break;
             case 'too-small':
                 statusText = '⚠️ Too small to claim';
                 statusClass = 'too-small';
                 break;
             default:
-                statusText = '❌ Failed';
-                statusClass = 'failed';
+                statusText = d.confirmations !== undefined ? `⏳ Confirming ${d.confirmations}/${d.requiredConfirmations || 3}` : '⏳ Confirming';
+                statusClass = 'claiming';
         }
         const shortTxid = `${d.txid.slice(0, 8)}…${d.txid.slice(-6)}`;
         return `<div class="pending-deposit-item" data-deposit-key="${key}" role="button" tabindex="0" title="Tap for details">
@@ -216,15 +223,20 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
         if (statusEl) statusEl.classList.add('hidden');
 
         for (const deposit of deposits) {
-            const key = `${deposit.txid}:${deposit.vout}`;
+            const depositInfo = deposit as typeof deposit & { isMature?: boolean; confirmations?: number };
+            const key = getClaimKey(deposit.txid, deposit.vout);
             if (claimedOnchainDeposits.has(key)) continue;
 
             depositClaimResults.set(key, {
-                status: 'claiming',
+                status: depositInfo.isMature === false ? 'confirming' : 'claiming',
                 amountSats: deposit.amountSats,
                 txid: deposit.txid,
+                confirmations: typeof depositInfo.confirmations === 'number' ? depositInfo.confirmations : undefined,
+                requiredConfirmations: 3,
             });
             renderPendingDeposits();
+
+            if (depositInfo.isMature === false) continue;
 
             try {
                 await breezSDK.claimDeposit({
@@ -245,15 +257,15 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
                     renderPendingDeposits();
                 }, 5000);
             } catch (claimError) {
-                const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
-                const isDust = errMsg.includes('dust') || errMsg.includes('less than');
+                const claimResult = classifyClaimError(claimError, Number(deposit.amountSats));
                 console.warn(`[Deposit] Failed to claim ${key}:`, claimError);
-                claimedOnchainDeposits.add(key);
                 depositClaimResults.set(key, {
-                    status: isDust ? 'too-small' : 'failed',
+                    status: claimResult.status,
                     amountSats: deposit.amountSats,
                     txid: deposit.txid,
-                    failureReason: errMsg,
+                    confirmations: typeof depositInfo.confirmations === 'number' ? depositInfo.confirmations : undefined,
+                    requiredConfirmations: 3,
+                    failureReason: claimResult.message,
                 });
                 renderPendingDeposits();
             }
