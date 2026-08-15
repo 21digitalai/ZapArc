@@ -139,6 +139,7 @@ export interface UserSettings {
   deniedFacebookGroups: string[];
   // Fiat currency preference
   fiatCurrency: 'usd' | 'eur';
+  invoiceExpirySecs: number;
 }
 
 export interface DomainSettings {

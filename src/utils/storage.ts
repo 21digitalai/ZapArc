@@ -19,6 +19,7 @@ import {
 
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 import * as bip39 from 'bip39';
+import { DEFAULT_INVOICE_EXPIRY_SECS } from './invoice-expiry';
 
 /**
  * Generate a UUID v4 string
@@ -361,7 +362,8 @@ export class ChromeStorageManager {
           facebookPostingMode: result.userSettings.facebookPostingMode || defaults.facebookPostingMode,
           allowedFacebookGroups: result.userSettings.allowedFacebookGroups || defaults.allowedFacebookGroups,
           deniedFacebookGroups: result.userSettings.deniedFacebookGroups || defaults.deniedFacebookGroups,
-          fiatCurrency
+          fiatCurrency,
+          invoiceExpirySecs: result.userSettings.invoiceExpirySecs !== undefined ? result.userSettings.invoiceExpirySecs : defaults.invoiceExpirySecs
         };
         return merged;
       }
@@ -608,7 +610,8 @@ export class ChromeStorageManager {
       facebookPostingMode: 'global',
       allowedFacebookGroups: [],
       deniedFacebookGroups: [],
-      fiatCurrency: 'usd'
+      fiatCurrency: 'usd',
+      invoiceExpirySecs: DEFAULT_INVOICE_EXPIRY_SECS
     };
   }
 

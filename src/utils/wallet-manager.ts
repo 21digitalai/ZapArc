@@ -261,7 +261,8 @@ export class WalletManager {
     this.ensureWalletReady();
 
     try {
-      const invoice = await this.breezSDK.receivePayment({ amountSats: amount, description });
+      const settings = await this.storage.getUserSettings();
+      const invoice = await this.breezSDK.receivePayment({ amountSats: amount, description, expirySecs: settings.invoiceExpirySecs });
       
       // Update activity timestamp
       await this.storage.updateActivity();

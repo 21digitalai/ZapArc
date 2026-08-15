@@ -14,6 +14,8 @@ import { showModal } from './modals';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getDisplayCurrency } from './currency-pref';
 import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
+import { ExtensionMessaging } from '../utils/messaging';
+import { DEFAULT_INVOICE_EXPIRY_SECS, getBolt11ExpiryTime } from '../utils/invoice-expiry';
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');
@@ -512,19 +514,22 @@ export async function generateDepositInvoice(amount: number): Promise<void> {
             return;
         }
 
+        const settingsResponse = await ExtensionMessaging.getUserSettings();
+        const expirySecs = settingsResponse.success && settingsResponse.data ? settingsResponse.data.invoiceExpirySecs : DEFAULT_INVOICE_EXPIRY_SECS;
         const description = `Receive ${amount.toLocaleString()} sats in ZapArc Wallet`;
         const response = await breezSDK.receivePayment({
             paymentMethod: {
                 type: 'bolt11Invoice',
                 description,
-                amountSats: amount
+                amountSats: amount,
+                expirySecs
             }
         });
 
         const invoice = response.paymentRequest;
         await displayInvoice(invoice, amount);
         showDepositStep('deposit-invoice-step');
-        startPaymentMonitoring(invoice);
+        startPaymentMonitoring(invoice, expirySecs);
     } catch (error) {
         showError(error instanceof Error ? error.message : 'Failed to generate invoice');
     } finally {
@@ -565,9 +570,9 @@ export function showDepositStep(stepId: string): void {
     });
 }
 
-export function startPaymentMonitoring(invoice: string): void {
+export function startPaymentMonitoring(invoice: string, fallbackExpirySecs: number = DEFAULT_INVOICE_EXPIRY_SECS): void {
     setCurrentMonitoredInvoice(invoice);
-    setInvoiceExpiryTime(Date.now() + (15 * 60 * 1000));
+    setInvoiceExpiryTime(getBolt11ExpiryTime(invoice, fallbackExpirySecs));
 
     if (paymentMonitoringInterval) clearInterval(paymentMonitoringInterval);
 

@@ -537,6 +537,14 @@
                     <div id="lightning-address-status" class="lightning-address-status hidden"></div>
                 </div>
 
+                <button id="settings-invoice-expiry-toggle-btn" class="settings-action-btn settings-toggle-btn" aria-expanded="false">⏱ Invoice Expiry <span class="settings-toggle-chevron" aria-hidden="true">▾</span></button>
+                <div id="invoice-expiry-section" class="lightning-address-section hidden">
+                    <div class="fiat-currency-description">How long newly generated Lightning invoices remain payable.</div>
+                    <select id="invoice-expiry-select" aria-label="Invoice expiry"><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="21600">6 hours</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="custom">Custom</option></select>
+                    <input id="invoice-expiry-custom-input" type="number" min="1" max="10080" step="1" placeholder="Custom minutes" aria-label="Custom invoice expiry in minutes" class="hidden">
+                    <div id="invoice-expiry-error" class="lightning-address-status hidden"></div>
+                </div>
+
                 <button id="settings-fiat-currency-toggle-btn" class="settings-action-btn settings-toggle-btn" aria-expanded="false">
                     💱 Fiat Currency
                     <span class="settings-toggle-chevron" aria-hidden="true">▾</span>

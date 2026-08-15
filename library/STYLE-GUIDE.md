@@ -112,3 +112,5 @@
 `.save-contact-actions` — right-aligned Cancel/Save actions for the save-contact prompt.
 
 `.save-contact-cancel`, `.save-contact-save` — semantic anchors for the prompt action buttons; compose with shared button utility classes.
+
+`.settings-action-btn` with `.lightning-address-section` — settings disclosure pattern. Invoice expiry uses this existing disclosure with native select/input controls, clear labels, and inline validation.

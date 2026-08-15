@@ -50,6 +50,7 @@ import { setupModalListeners, showPINModal, promptForPIN, promptForText } from '
 
 // Utility imports
 import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
+import { DEFAULT_INVOICE_EXPIRY_SECS, customMinutesToExpirySecs, isInvoiceExpiryPreset } from '../utils/invoice-expiry';
 
 // Wallet Management imports
 import {
@@ -3014,6 +3015,15 @@ function setupEventListeners() {
         };
     }
 
+    const invoiceExpiryToggleBtn = document.getElementById('settings-invoice-expiry-toggle-btn');
+    if (invoiceExpiryToggleBtn) {
+        invoiceExpiryToggleBtn.onclick = () => toggleInvoiceExpirySettings();
+    }
+    const invoiceExpirySelect = document.getElementById('invoice-expiry-select') as HTMLSelectElement | null;
+    const invoiceExpiryCustom = document.getElementById('invoice-expiry-custom-input') as HTMLInputElement | null;
+    if (invoiceExpirySelect) invoiceExpirySelect.addEventListener('change', () => void saveInvoiceExpiry());
+    if (invoiceExpiryCustom) invoiceExpiryCustom.addEventListener('change', () => void saveInvoiceExpiry());
+
     const fiatCurrencyUsdBtn = document.getElementById('fiat-currency-usd-btn');
     const fiatCurrencyEurBtn = document.getElementById('fiat-currency-eur-btn');
     if (fiatCurrencyUsdBtn && fiatCurrencyEurBtn) {
@@ -3251,6 +3261,48 @@ async function refreshFiatCurrencyUI(): Promise<void> {
         eurBtn.classList.add('active');
         usdBtn.classList.remove('active');
     }
+}
+
+async function toggleInvoiceExpirySettings(): Promise<void> {
+    const section = document.getElementById('invoice-expiry-section');
+    const button = document.getElementById('settings-invoice-expiry-toggle-btn');
+    if (!section || !button) return;
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', String(!expanded));
+    section.classList.toggle('hidden', expanded);
+    if (!expanded) await refreshInvoiceExpiryUI();
+}
+
+async function refreshInvoiceExpiryUI(): Promise<void> {
+    const select = document.getElementById('invoice-expiry-select') as HTMLSelectElement | null;
+    const custom = document.getElementById('invoice-expiry-custom-input') as HTMLInputElement | null;
+    if (!select || !custom) return;
+    const response = await ExtensionMessaging.getUserSettings();
+    const expiry = response.success && response.data ? response.data.invoiceExpirySecs : DEFAULT_INVOICE_EXPIRY_SECS;
+    select.value = isInvoiceExpiryPreset(expiry) ? String(expiry) : 'custom';
+    custom.classList.toggle('hidden', select.value !== 'custom');
+    custom.value = select.value === 'custom' ? String(Math.round(expiry / 60)) : '';
+}
+
+async function saveInvoiceExpiry(): Promise<void> {
+    const select = document.getElementById('invoice-expiry-select') as HTMLSelectElement | null;
+    const custom = document.getElementById('invoice-expiry-custom-input') as HTMLInputElement | null;
+    const error = document.getElementById('invoice-expiry-error');
+    if (!select || !custom) return;
+    custom.classList.toggle('hidden', select.value !== 'custom');
+    const expirySecs = select.value === 'custom' ? customMinutesToExpirySecs(custom.value) : Number(select.value);
+    if (!expirySecs) {
+        if (error) { error.textContent = 'Enter a duration from 1 minute to 7 days.'; error.classList.remove('hidden'); }
+        return;
+    }
+    if (error) error.classList.add('hidden');
+    const response = await ExtensionMessaging.getUserSettings();
+    if (!response.success || !response.data) { showError('Failed to load settings'); return; }
+    const settings = response.data as UserSettings;
+    settings.invoiceExpirySecs = expirySecs;
+    const saved = await ExtensionMessaging.saveUserSettings(settings);
+    if (!saved.success) { showError('Failed to save invoice expiry'); return; }
+    showSuccess('Invoice expiry updated');
 }
 
 async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {

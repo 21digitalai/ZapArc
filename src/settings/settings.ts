@@ -3,6 +3,7 @@
 import './settings.css';
 import { UserSettings } from '../types';
 import { ExtensionMessaging } from '../utils/messaging';
+import { DEFAULT_INVOICE_EXPIRY_SECS, customMinutesToExpirySecs, isInvoiceExpiryPreset } from '../utils/invoice-expiry';
 
 console.log('ZapArc settings page loaded');
 
@@ -42,7 +43,8 @@ function getDefaultSettings(): UserSettings {
         facebookPostingMode: 'global',
         allowedFacebookGroups: [],
         deniedFacebookGroups: [],
-        fiatCurrency: 'usd'
+        fiatCurrency: 'usd',
+        invoiceExpirySecs: DEFAULT_INVOICE_EXPIRY_SECS
     };
 }
 
@@ -68,6 +70,9 @@ function populateForm(): void {
     (document.getElementById('floating-menu-enabled') as HTMLInputElement).checked = currentSettings.floatingMenuEnabled;
     (document.getElementById('autolock-timeout') as HTMLSelectElement).value = currentSettings.autoLockTimeout.toString();
     (document.getElementById('fiat-currency') as HTMLSelectElement).value = currentSettings.fiatCurrency || 'usd';
+    const expiry = currentSettings.invoiceExpirySecs || DEFAULT_INVOICE_EXPIRY_SECS;
+    (document.getElementById('invoice-expiry') as HTMLSelectElement).value = isInvoiceExpiryPreset(expiry) ? String(expiry) : 'custom';
+    (document.getElementById('invoice-expiry-custom') as HTMLInputElement).value = isInvoiceExpiryPreset(expiry) ? '' : String(Math.round(expiry / 60));
 }
 
 function setupEventListeners(): void {
@@ -134,7 +139,7 @@ function setupEventListeners(): void {
     const autoSaveElements = [
         'floating-menu-enabled',
         'autolock-timeout',
-        'fiat-currency'
+        'fiat-currency', 'invoice-expiry', 'invoice-expiry-custom'
     ];
     
     autoSaveElements.forEach(id => {
@@ -175,6 +180,10 @@ async function saveSettings(): Promise<void> {
             return;
         }
         
+        const expirySelect = document.getElementById('invoice-expiry') as HTMLSelectElement;
+        const customExpiry = document.getElementById('invoice-expiry-custom') as HTMLInputElement;
+        const invoiceExpirySecs = expirySelect.value === 'custom' ? customMinutesToExpirySecs(customExpiry.value) : Number(expirySelect.value);
+        if (!invoiceExpirySecs) { showFieldError('invoice-expiry-custom', 'Enter a duration from 1 minute to 7 days.'); return; }
         // Collect settings
         const newSettings: UserSettings = {
             useBuiltInWallet: builtinRadio.checked,
@@ -184,7 +193,8 @@ async function saveSettings(): Promise<void> {
             facebookPostingMode: currentSettings.facebookPostingMode,
             allowedFacebookGroups: currentSettings.allowedFacebookGroups,
             deniedFacebookGroups: currentSettings.deniedFacebookGroups,
-            fiatCurrency: (document.getElementById('fiat-currency') as HTMLSelectElement).value as 'usd' | 'eur'
+            fiatCurrency: (document.getElementById('fiat-currency') as HTMLSelectElement).value as 'usd' | 'eur',
+            invoiceExpirySecs
         };
         
         // Save settings

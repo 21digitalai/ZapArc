@@ -64,6 +64,13 @@
                     <div style="font-size: 12px; color: #666; margin-top: 4px;">
                         Automatically locks your wallet after inactivity for security. "Never" is not recommended for security reasons.
                     </div>
+                    <label>Invoice expiry:
+                        <select id="invoice-expiry" required aria-label="Invoice expiry">
+                            <option value="900">15 minutes</option><option value="3600">1 hour</option><option value="21600">6 hours</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <input id="invoice-expiry-custom" type="number" min="1" max="10080" step="1" placeholder="Custom duration in minutes" aria-label="Custom invoice expiry in minutes">
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">Applies only to newly generated Lightning invoices (1 minute to 7 days).</div>
                     
                     <label>
                         Fiat currency:

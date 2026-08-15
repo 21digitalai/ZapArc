@@ -12,6 +12,7 @@ export interface BreezConfig {
 export interface InvoiceRequest {
   amountSats: number;
   description: string;
+  expirySecs?: number;
 }
 
 export interface PaymentRequest {
@@ -134,7 +135,8 @@ export class BreezSDKWrapper {
         paymentMethod: {
           type: 'bolt11Invoice',
           description: request.description || '',
-          amountSats: request.amountSats
+          amountSats: request.amountSats,
+          expirySecs: request.expirySecs
         }
       });
       return response.paymentRequest;
