@@ -28,8 +28,8 @@ function bolt11WithExpiry(timestamp: number, expirySecs: number): string {
 }
 
 describe('invoice expiry settings', () => {
-  it('uses one hour by default and retains every approved preset', () => {
-    expect(DEFAULT_INVOICE_EXPIRY_SECS).toBe(3600);
+  it('uses six hours by default and retains every approved preset', () => {
+    expect(DEFAULT_INVOICE_EXPIRY_SECS).toBe(21600);
     expect([900, 3600, 21600, 86400, 604800].every(isInvoiceExpiryPreset)).toBe(true);
   });
 
@@ -68,7 +68,7 @@ describe('invoice expiry persistence and forwarding', () => {
     };
   });
 
-  it('merges legacy settings with the one-hour default and preserves an explicit saved choice', async () => {
+  it('merges legacy settings with the six-hour default and preserves an explicit saved choice', async () => {
     storage.userSettings = { useBuiltInWallet: false, autoLockTimeout: 0, fiatCurrency: 'eur' };
     const manager = new ChromeStorageManager();
     expect((await manager.getUserSettings()).invoiceExpirySecs).toBe(DEFAULT_INVOICE_EXPIRY_SECS);

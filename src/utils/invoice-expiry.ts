@@ -1,6 +1,6 @@
 export const MIN_INVOICE_EXPIRY_SECS = 60;
 export const MAX_INVOICE_EXPIRY_SECS = 7 * 24 * 60 * 60;
-export const DEFAULT_INVOICE_EXPIRY_SECS = 3600;
+export const DEFAULT_INVOICE_EXPIRY_SECS = 21600;
 export const INVOICE_EXPIRY_PRESETS = [900, 3600, 21600, 86400, MAX_INVOICE_EXPIRY_SECS] as const;
 
 export function customMinutesToExpirySecs(value: string): number | null {
