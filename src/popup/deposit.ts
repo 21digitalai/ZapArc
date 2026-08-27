@@ -11,11 +11,58 @@ import {
 } from './state';
 import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
-import { satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
+import { fiatToSats, satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
 import { getDisplayCurrency, getUserFiatCurrency } from './currency-pref';
 import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
 import { ExtensionMessaging } from '../utils/messaging';
 import { DEFAULT_INVOICE_EXPIRY_SECS, getBolt11ExpiryTime } from '../utils/invoice-expiry';
+
+type ReceiveInputCurrency = 'sats' | FiatCurrency;
+
+let receiveInputCurrency: ReceiveInputCurrency = 'sats';
+let receiveDefaultFiat: FiatCurrency = 'usd';
+
+async function loadReceiveCurrencySetting(): Promise<void> {
+    const [displayCurrency, preferredFiat] = await Promise.all([
+        getDisplayCurrency(),
+        getUserFiatCurrency(),
+    ]);
+    receiveInputCurrency = displayCurrency;
+    receiveDefaultFiat = preferredFiat;
+    updateReceiveCurrencyUI();
+}
+
+function updateReceiveCurrencyUI(): void {
+    const select = document.getElementById('receive-currency-select') as HTMLSelectElement | null;
+    const amountInput = document.getElementById('deposit-amount') as HTMLInputElement | null;
+    if (select) select.value = receiveInputCurrency;
+    if (amountInput) {
+        amountInput.placeholder = receiveInputCurrency === 'sats'
+            ? 'Amount in sats'
+            : `Amount in ${receiveInputCurrency.toUpperCase()}`;
+        amountInput.step = receiveInputCurrency === 'sats' ? '1' : '0.01';
+        amountInput.min = receiveInputCurrency === 'sats' ? '1' : '0.01';
+        if (receiveInputCurrency === 'sats') amountInput.max = '100000000';
+        else amountInput.removeAttribute('max');
+    }
+
+    const presets = receiveInputCurrency === 'sats'
+        ? [10000, 50000, 100000, 500000]
+        : [10, 25, 50, 100];
+    document.querySelectorAll<HTMLElement>('.quick-amount-btn').forEach((button, index) => {
+        const value = presets[index];
+        if (value === undefined) return;
+        button.dataset.amount = String(value);
+        button.textContent = receiveInputCurrency === 'sats' ? `${value / 1000}K` : String(value);
+        button.classList.remove('selected');
+    });
+}
+
+async function receiveAmountToSats(amount: number): Promise<number | null> {
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    if (receiveInputCurrency === 'sats') return Math.round(amount);
+    return fiatToSats(amount, receiveInputCurrency);
+}
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');
@@ -34,31 +81,29 @@ function updateDepositEstimate(amount: number): void {
 
     // Use the shared currency display selection
     (async () => {
-        const [displayCurrency, preferredFiat] = await Promise.all([
-            getDisplayCurrency(),
-            getUserFiatCurrency(),
-        ]);
-        const spotPrice = await getBtcSpotPrice(preferredFiat);
-        if (displayCurrency === 'sats') {
-            valueEl.textContent = spotPrice
-                ? `≈ ${amount.toLocaleString()} sats\n${spotPrice}`
-                : `≈ ${amount.toLocaleString()} sats`;
-            row.classList.remove('hidden');
-            return;
-        }
-
-        const fiatAmount = await satsToFiat(amount, displayCurrency);
-        if (!fiatAmount) {
+        const sats = await receiveAmountToSats(amount);
+        if (!sats) {
             valueEl.textContent = '≈ rate unavailable';
             return;
         }
-        if (fiatAmount >= 0.01) {
-            const estimate = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
-            valueEl.textContent = spotPrice ? `${estimate}\n${spotPrice}` : estimate;
-            row.classList.remove('hidden');
+
+        const spotCurrency = receiveInputCurrency === 'sats' ? receiveDefaultFiat : receiveInputCurrency;
+        const [defaultFiatAmount, spotPrice] = await Promise.all([
+            satsToFiat(sats, receiveDefaultFiat),
+            getBtcSpotPrice(spotCurrency),
+        ]);
+        const lines: string[] = [];
+        if (receiveInputCurrency === 'sats') {
+            if (defaultFiatAmount !== null) lines.push(`≈ ${formatFiat(defaultFiatAmount, receiveDefaultFiat)}`);
         } else {
-            row.classList.add('hidden');
+            lines.push(`= ${sats.toLocaleString()} sats`);
+            if (receiveInputCurrency !== receiveDefaultFiat && defaultFiatAmount !== null) {
+                lines.push(`≈ ${formatFiat(defaultFiatAmount, receiveDefaultFiat)} ${receiveDefaultFiat.toUpperCase()}`);
+            }
         }
+        if (spotPrice) lines.push(spotPrice);
+        valueEl.textContent = lines.join('\n') || '≈ rate unavailable';
+        row.classList.remove('hidden');
     })();
 }
 
@@ -319,6 +364,8 @@ export function showDepositInterface(): void {
     const amountInput = document.getElementById('deposit-amount') as HTMLInputElement;
     if (amountInput) amountInput.value = '';
 
+    void loadReceiveCurrencySetting();
+
     setupDepositListeners();
 }
 
@@ -455,6 +502,7 @@ export function setupDepositListeners(): void {
 
     const depositAmount = document.getElementById('deposit-amount') as HTMLInputElement;
     const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
+    const currencySelect = document.getElementById('receive-currency-select') as HTMLSelectElement | null;
     const copyBtn = document.getElementById('copy-invoice-btn');
     const newInvoiceBtn = document.getElementById('new-invoice-btn');
 
@@ -469,23 +517,33 @@ export function setupDepositListeners(): void {
                 document.querySelectorAll('.quick-amount-btn').forEach(b => b.classList.remove('selected'));
                 target.classList.add('selected');
                 // Update estimate
-                updateDepositEstimate(parseInt(amount));
+                updateDepositEstimate(parseFloat(amount));
             }
         });
     });
 
     if (depositAmount) {
         depositAmount.addEventListener('input', () => {
-            const amount = parseInt(depositAmount.value);
+            const amount = parseFloat(depositAmount.value);
             // Clear quick amount selection
             document.querySelectorAll('.quick-amount-btn').forEach(b => b.classList.remove('selected'));
             updateDepositEstimate(amount);
         });
     }
 
+    currencySelect?.addEventListener('change', () => {
+        const nextCurrency = currencySelect.value as ReceiveInputCurrency;
+        if (nextCurrency !== 'sats' && nextCurrency !== 'usd' && nextCurrency !== 'eur') return;
+        receiveInputCurrency = nextCurrency;
+        if (depositAmount) depositAmount.value = '';
+        updateReceiveCurrencyUI();
+        updateDepositEstimate(0);
+    });
+
     generateBtn?.addEventListener('click', async () => {
-        const amount = parseInt(depositAmount.value);
-        if (amount > 0) await generateDepositInvoice(amount);
+        const enteredAmount = parseFloat(depositAmount.value);
+        const amountSats = await receiveAmountToSats(enteredAmount);
+        if (amountSats && amountSats > 0) await generateDepositInvoice(amountSats);
     });
 
     copyBtn?.addEventListener('click', () => {

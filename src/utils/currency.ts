@@ -216,3 +216,12 @@ export const getRate = (currency: FiatCurrency) =>
 
 export const getRates = () => 
   currencyService.getRates();
+
+export function formatSelectedCurrencyAmount(
+  amount: string,
+  enteredCurrency: 'sats' | FiatCurrency,
+  defaultFiat: FiatCurrency
+): string | null {
+  if (!amount || enteredCurrency === 'sats' || enteredCurrency === defaultFiat) return null;
+  return `Selected amount: ${amount} ${enteredCurrency.toUpperCase()}`;
+}

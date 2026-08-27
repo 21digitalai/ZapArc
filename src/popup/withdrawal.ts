@@ -10,8 +10,8 @@ import {
 } from './state';
 import { isExistingContact, openContactModalWithAddress, openContactPicker, showContactsInterface } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
-import { currencyService, fiatToSats, satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
-import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
+import { currencyService, fiatToSats, satsToFiat, formatFiat, formatSelectedCurrencyAmount, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
+import { getUserFiatCurrency, getDisplayCurrency, type DisplayCurrency } from './currency-pref';
 import { nonblankPaymentComment, preparedPaymentComment, savePaymentComment } from './payment-comment';
 
 export type WithdrawalCallbacks = {
@@ -188,7 +188,8 @@ async function updateConversionHint(): Promise<void> {
     }
 
     conversionHint.classList.remove('hidden');
-    const spotPrice = await getBtcSpotPrice(userFiatCurrency);
+    const spotCurrency = sendInputCurrency === 'sats' ? userFiatCurrency : sendInputCurrency;
+    const spotPrice = await getBtcSpotPrice(spotCurrency);
 
     if (sendInputCurrency === 'sats') {
         // Show fiat equivalent
@@ -203,8 +204,15 @@ async function updateConversionHint(): Promise<void> {
         // Show sats equivalent
         const sats = await fiatToSats(rawValue, sendInputCurrency);
         if (sats !== null) {
-            const estimate = `= ${sats.toLocaleString()} sats`;
-            conversionHint.textContent = spotPrice ? `${estimate}\n${spotPrice}` : estimate;
+            const lines = [`= ${sats.toLocaleString()} sats`];
+            if (sendInputCurrency !== userFiatCurrency) {
+                const defaultFiat = await satsToFiat(sats, userFiatCurrency);
+                if (defaultFiat !== null) {
+                    lines.push(`≈ ${formatFiat(defaultFiat, userFiatCurrency)} ${userFiatCurrency.toUpperCase()}`);
+                }
+            }
+            if (spotPrice) lines.push(spotPrice);
+            conversionHint.textContent = lines.join('\n');
         } else {
             conversionHint.textContent = '= rate unavailable';
         }
@@ -385,9 +393,6 @@ export function setupWithdrawalListeners(): void {
         }
 
         sendInputCurrency = nextCurrency;
-        void persistDisplayCurrency(sendInputCurrency).catch((error) => {
-            console.warn('[Withdrawal] Failed to persist display currency:', error);
-        });
 
         const amtInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
         if (amtInput) amtInput.value = ''; // clear on currency change to avoid confusion
@@ -686,6 +691,8 @@ export async function previewPayment(): Promise<void> {
         previewBtn.textContent = 'Analyzing...';
 
         const input = paymentInput.value.trim();
+        const enteredAmount = amountInput?.value.trim() || '';
+        const enteredCurrency = sendInputCurrency;
         
         // Convert amount to sats — SDK always expects integer sats
         let amount: number;
@@ -732,7 +739,9 @@ export async function previewPayment(): Promise<void> {
                 amount: invoiceAmount,
                 fee: prepFee,
                 type: 'bolt11',
-                prepareResponse: prepared
+                prepareResponse: prepared,
+                enteredAmount,
+                enteredCurrency
             });
         } else {
             let lnurlInput = input;
@@ -784,7 +793,9 @@ export async function previewPayment(): Promise<void> {
                 amount,
                 fee: prepareResponse.feeSats,
                 type: 'lnurl',
-                prepareResponse
+                prepareResponse,
+                enteredAmount,
+                enteredCurrency
             });
         }
     } catch (error) {
@@ -809,7 +820,7 @@ export function displayPaymentPreview(previewData: any): void {
 
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
     const total = previewData.amount + previewData.fee;
-    setPreviewAmount(amountEl, previewData.amount);
+    setPreviewAmount(amountEl, previewData.amount, previewData.enteredAmount, previewData.enteredCurrency);
     setPreviewAmount(feeEl, previewData.fee);
     setPreviewAmount(totalEl, total);
     const comment = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value) || '';
@@ -829,7 +840,12 @@ export function displayPaymentPreview(previewData: any): void {
     }
 }
 
-function setPreviewAmount(element: HTMLElement | null, sats: number): void {
+function setPreviewAmount(
+    element: HTMLElement | null,
+    sats: number,
+    enteredAmount?: string,
+    enteredCurrency?: DisplayCurrency
+): void {
     if (!element) return;
 
     element.textContent = '';
@@ -842,6 +858,16 @@ function setPreviewAmount(element: HTMLElement | null, sats: number): void {
     fiatEl.textContent = '≈ ...';
 
     element.append(satsEl, fiatEl);
+
+    const selectedAmount = enteredCurrency
+        ? formatSelectedCurrencyAmount(enteredAmount || '', enteredCurrency, userFiatCurrency)
+        : null;
+    if (selectedAmount) {
+        const selectedEl = document.createElement('span');
+        selectedEl.className = 'preview-fiat preview-selected-currency';
+        selectedEl.textContent = selectedAmount;
+        element.append(selectedEl);
+    }
 
     const currency = userFiatCurrency;
 

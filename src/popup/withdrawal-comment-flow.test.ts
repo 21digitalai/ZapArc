@@ -11,7 +11,7 @@ vi.mock('./state', () => ({
 }));
 vi.mock('./contacts', () => ({ isExistingContact: vi.fn(), openContactModalWithAddress: vi.fn(), openContactPicker: vi.fn(), showContactsInterface: vi.fn() }));
 vi.mock('./notifications', () => ({ showError: vi.fn(), showSuccess: vi.fn(), showConfirmDialog: vi.fn(async () => true) }));
-vi.mock('../utils/currency', () => ({ currencyService: {}, fiatToSats: vi.fn(), satsToFiat: vi.fn(), formatFiat: vi.fn() }));
+vi.mock('../utils/currency', () => ({ currencyService: {}, fiatToSats: vi.fn(), satsToFiat: vi.fn(), formatFiat: vi.fn(), formatSelectedCurrencyAmount: vi.fn(), getBtcSpotPrice: vi.fn() }));
 vi.mock('./currency-pref', () => ({ getUserFiatCurrency: vi.fn(), getDisplayCurrency: vi.fn(), persistDisplayCurrency: vi.fn() }));
 
 type TestElement = {

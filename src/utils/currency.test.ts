@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { currencyService, getBtcSpotPrice } from './currency';
+import { currencyService, formatSelectedCurrencyAmount, getBtcSpotPrice } from './currency';
 
 describe('BTC spot price', () => {
   beforeEach(() => {
@@ -23,5 +23,11 @@ describe('BTC spot price', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
     await expect(getBtcSpotPrice('usd')).resolves.toBeNull();
+  });
+
+  it('shows a separately entered fiat amount only when it differs from the default', () => {
+    expect(formatSelectedCurrencyAmount('25', 'eur', 'usd')).toBe('Selected amount: 25 EUR');
+    expect(formatSelectedCurrencyAmount('25', 'usd', 'usd')).toBeNull();
+    expect(formatSelectedCurrencyAmount('2500', 'sats', 'usd')).toBeNull();
   });
 });

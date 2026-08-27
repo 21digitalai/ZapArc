@@ -659,7 +659,11 @@
                         <div class="deposit-form-label">Amount to receive</div>
                         <div class="deposit-amount-row">
                             <input type="number" id="deposit-amount" class="deposit-amount-input" placeholder="0" min="1" max="100000000">
-                            <span class="deposit-amount-unit">sats</span>
+                            <select id="receive-currency-select" class="currency-select" aria-label="Select receive amount currency">
+                                <option value="sats">sats</option>
+                                <option value="usd">USD ($)</option>
+                                <option value="eur">EUR (€)</option>
+                            </select>
                         </div>
                         <div class="quick-amounts">
                             <button class="quick-amount-btn" data-amount="10000">10K</button>
