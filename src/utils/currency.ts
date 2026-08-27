@@ -172,6 +172,16 @@ class CurrencyService {
   }
 
   /**
+   * Format the current BTC spot price in the user's preferred fiat currency.
+   */
+  async getBtcSpotPrice(currency: FiatCurrency): Promise<string | null> {
+    const rate = await this.getRate(currency);
+    if (!rate) return null;
+
+    return `1 BTC ≈ ${this.formatFiat(rate, currency)}`;
+  }
+
+  /**
    * Clear the rate cache (useful for testing or manual refresh)
    */
   clearCache(): void {
@@ -197,6 +207,9 @@ export const formatSats = (sats: number) =>
 
 export const formatWithFiat = (sats: number, currency: FiatCurrency) => 
   currencyService.formatWithFiat(sats, currency);
+
+export const getBtcSpotPrice = (currency: FiatCurrency) =>
+  currencyService.getBtcSpotPrice(currency);
 
 export const getRate = (currency: FiatCurrency) => 
   currencyService.getRate(currency);

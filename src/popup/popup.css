@@ -2914,6 +2914,7 @@ body.modal-open {
   color: rgba(255, 255, 255, 0.55);
   margin-top: 4px;
   padding-left: 2px;
+  white-space: pre-line;
 }
 
 .conversion-hint.hidden {
@@ -4239,7 +4240,7 @@ body.modal-open {
 .deposit-amount-unit { font-size: 14px; color: var(--text-placeholder); font-weight: 500; margin-left: 8px; }
 .deposit-estimate-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
 .deposit-estimate-label { font-size: 12px; color: var(--text-secondary); }
-.deposit-estimate-value { font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500; }
+.deposit-estimate-value { font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500; text-align: right; white-space: pre-line; }
 .deposit-generate-btn { width: 100%; margin-top: 4px; }
 
 /* Quick amounts selected state */

@@ -10,7 +10,7 @@ import {
 } from './state';
 import { isExistingContact, openContactModalWithAddress, openContactPicker, showContactsInterface } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
-import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
+import { currencyService, fiatToSats, satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
 import { nonblankPaymentComment, preparedPaymentComment, savePaymentComment } from './payment-comment';
 
@@ -188,12 +188,14 @@ async function updateConversionHint(): Promise<void> {
     }
 
     conversionHint.classList.remove('hidden');
+    const spotPrice = await getBtcSpotPrice(userFiatCurrency);
 
     if (sendInputCurrency === 'sats') {
         // Show fiat equivalent
         const fiatAmount = await satsToFiat(rawValue, userFiatCurrency);
         if (fiatAmount !== null) {
-            conversionHint.textContent = `≈ ${formatFiat(fiatAmount, userFiatCurrency)}`;
+            const estimate = `≈ ${formatFiat(fiatAmount, userFiatCurrency)}`;
+            conversionHint.textContent = spotPrice ? `${estimate}\n${spotPrice}` : estimate;
         } else {
             conversionHint.textContent = '≈ rate unavailable';
         }
@@ -201,7 +203,8 @@ async function updateConversionHint(): Promise<void> {
         // Show sats equivalent
         const sats = await fiatToSats(rawValue, sendInputCurrency);
         if (sats !== null) {
-            conversionHint.textContent = `= ${sats.toLocaleString()} sats`;
+            const estimate = `= ${sats.toLocaleString()} sats`;
+            conversionHint.textContent = spotPrice ? `${estimate}\n${spotPrice}` : estimate;
         } else {
             conversionHint.textContent = '= rate unavailable';
         }

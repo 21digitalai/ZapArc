@@ -11,8 +11,8 @@ import {
 } from './state';
 import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
-import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
-import { getDisplayCurrency } from './currency-pref';
+import { satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
+import { getDisplayCurrency, getUserFiatCurrency } from './currency-pref';
 import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
 import { ExtensionMessaging } from '../utils/messaging';
 import { DEFAULT_INVOICE_EXPIRY_SECS, getBolt11ExpiryTime } from '../utils/invoice-expiry';
@@ -34,9 +34,15 @@ function updateDepositEstimate(amount: number): void {
 
     // Use the shared currency display selection
     (async () => {
-        const displayCurrency = await getDisplayCurrency();
+        const [displayCurrency, preferredFiat] = await Promise.all([
+            getDisplayCurrency(),
+            getUserFiatCurrency(),
+        ]);
+        const spotPrice = await getBtcSpotPrice(preferredFiat);
         if (displayCurrency === 'sats') {
-            valueEl.textContent = `≈ ${amount.toLocaleString()} sats`;
+            valueEl.textContent = spotPrice
+                ? `≈ ${amount.toLocaleString()} sats\n${spotPrice}`
+                : `≈ ${amount.toLocaleString()} sats`;
             row.classList.remove('hidden');
             return;
         }
@@ -47,7 +53,8 @@ function updateDepositEstimate(amount: number): void {
             return;
         }
         if (fiatAmount >= 0.01) {
-            valueEl.textContent = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
+            const estimate = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
+            valueEl.textContent = spotPrice ? `${estimate}\n${spotPrice}` : estimate;
             row.classList.remove('hidden');
         } else {
             row.classList.add('hidden');
