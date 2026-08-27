@@ -1,6 +1,6 @@
 {
   "name": "zaparc-wallet-extension",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Self-custodial Bitcoin wallet extension with Lightning and on-chain support.",
   "main": "dist/background.js",
   "scripts": {
