@@ -11,7 +11,14 @@ import {
 } from './state';
 import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
-import { fiatToSats, satsToFiat, formatFiat, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
+import {
+    fiatToSats,
+    satsToFiat,
+    formatFiat,
+    formatSelectedCurrencyAmount,
+    getBtcSpotPrice,
+    type FiatCurrency
+} from '../utils/currency';
 import { getDisplayCurrency, getUserFiatCurrency } from './currency-pref';
 import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
 import { ExtensionMessaging } from '../utils/messaging';
@@ -608,6 +615,30 @@ export async function generateDepositInvoice(amount: number): Promise<void> {
 export async function displayInvoice(invoice: string, amount: number): Promise<void> {
     const amountDisplay = document.getElementById('invoice-amount-display');
     if (amountDisplay) amountDisplay.textContent = amount.toLocaleString();
+
+    const amountContext = document.getElementById('invoice-amount-context');
+    if (amountContext) {
+        const enteredAmount = (document.getElementById('deposit-amount') as HTMLInputElement | null)?.value.trim() || '';
+        const spotCurrency = receiveInputCurrency === 'sats' ? receiveDefaultFiat : receiveInputCurrency;
+        const [defaultFiatAmount, spotPrice] = await Promise.all([
+            satsToFiat(amount, receiveDefaultFiat),
+            getBtcSpotPrice(spotCurrency),
+        ]);
+        const lines: string[] = [];
+        if (defaultFiatAmount !== null) {
+            lines.push(`≈ ${formatFiat(defaultFiatAmount, receiveDefaultFiat)} ${receiveDefaultFiat.toUpperCase()}`);
+        }
+        const selectedAmount = formatSelectedCurrencyAmount(
+            enteredAmount,
+            receiveInputCurrency,
+            receiveDefaultFiat
+        );
+        if (selectedAmount) lines.push(selectedAmount);
+        if (spotPrice) lines.push(spotPrice);
+
+        amountContext.textContent = lines.join('\n');
+        amountContext.classList.toggle('hidden', lines.length === 0);
+    }
 
     const invoiceText = document.getElementById('invoice-text') as HTMLTextAreaElement;
     if (invoiceText) invoiceText.value = invoice;

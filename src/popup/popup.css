@@ -3811,6 +3811,7 @@ body.modal-open {
 .quick-amount-btn:hover { transform: translateY(-1px); }
 .qr-container { text-align: center; margin-bottom: 16px; }
 .invoice-amount-row { margin-bottom: 8px; }
+.invoice-amount-context { margin: -2px 0 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; white-space: pre-line; }
 .invoice-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .invoice-text { flex: 1; min-height: 80px; font-family: monospace; font-size: 12px; }
 .payment-status-card { text-align: center; padding: 12px; background: rgba(255,255,255,0.08); border-radius: 8px; }
