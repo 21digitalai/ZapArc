@@ -655,6 +655,18 @@
                 </div>
 
                 <div id="deposit-lightning-content">
+                    <div id="receive-lightning-address-card" class="receive-lightning-address-card hidden">
+                        <div class="receive-lightning-address-heading">Lightning Address</div>
+                        <div class="receive-lightning-address-qr-wrap">
+                            <canvas id="receive-lightning-address-qr" aria-label="Lightning Address QR code"></canvas>
+                        </div>
+                        <div id="receive-lightning-address-text" class="receive-lightning-address-text"></div>
+                        <div class="receive-lightning-address-actions">
+                            <button id="receive-lightning-address-copy" class="btn-secondary" type="button">Copy</button>
+                            <button id="receive-lightning-address-save" class="btn-secondary" type="button">Save</button>
+                        </div>
+                    </div>
+
                     <div class="deposit-step" id="deposit-amount-step">
                         <div class="deposit-form-label">Amount to receive</div>
                         <div class="deposit-amount-row">

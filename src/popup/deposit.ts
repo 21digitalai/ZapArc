@@ -118,6 +118,7 @@ export type DepositCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
     loadTransactionHistory: () => Promise<void>;
     onPaymentReceived?: () => Promise<void>;
+    getLightningAddress?: () => string | null;
 };
 
 let callbacks: DepositCallbacks | null = null;
@@ -129,6 +130,57 @@ const claimedOnchainDeposits = new Set<string>();
 
 export function setDepositCallbacks(cb: DepositCallbacks): void {
     callbacks = cb;
+}
+
+async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string): Promise<void> {
+    await QRCode.toCanvas(canvas, address, {
+        width: 168,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#000000', light: '#FFFFFF' }
+    });
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    const logo = new Image();
+    logo.src = chrome.runtime.getURL('icons/bolt-transparent-latest.png');
+    await new Promise<void>((resolve) => {
+        logo.onload = () => {
+            const size = Math.round(canvas.width * 0.18);
+            const x = Math.round((canvas.width - size) / 2);
+            const y = Math.round((canvas.height - size) / 2);
+            context.fillStyle = '#FFFFFF';
+            context.beginPath();
+            context.roundRect(x - 4, y - 4, size + 8, size + 8, 8);
+            context.fill();
+            context.drawImage(logo, x, y, size, size);
+            resolve();
+        };
+        logo.onerror = () => resolve();
+    });
+}
+
+async function renderReceiveLightningAddress(): Promise<void> {
+    const card = document.getElementById('receive-lightning-address-card');
+    const text = document.getElementById('receive-lightning-address-text');
+    const canvas = document.getElementById('receive-lightning-address-qr') as HTMLCanvasElement | null;
+    const address = callbacks?.getLightningAddress?.()?.trim() || '';
+
+    if (!card || !text || !canvas || !address) {
+        card?.classList.add('hidden');
+        if (text) text.textContent = '';
+        return;
+    }
+
+    text.textContent = address;
+    try {
+        await drawLightningAddressQR(canvas, address);
+        card.classList.remove('hidden');
+    } catch (error) {
+        console.warn('[Deposit] Failed to render Lightning Address QR:', error);
+        card.classList.add('hidden');
+    }
 }
 
 export function setCurrentMonitoredInvoice(invoice: string | null): void {
@@ -372,6 +424,7 @@ export function showDepositInterface(): void {
     if (amountInput) amountInput.value = '';
 
     void loadReceiveCurrencySetting();
+    void renderReceiveLightningAddress();
 
     setupDepositListeners();
 }
@@ -512,6 +565,30 @@ export function setupDepositListeners(): void {
     const currencySelect = document.getElementById('receive-currency-select') as HTMLSelectElement | null;
     const copyBtn = document.getElementById('copy-invoice-btn');
     const newInvoiceBtn = document.getElementById('new-invoice-btn');
+    const addressCopyBtn = document.getElementById('receive-lightning-address-copy');
+    const addressSaveBtn = document.getElementById('receive-lightning-address-save');
+
+    addressCopyBtn?.addEventListener('click', async () => {
+        const address = callbacks?.getLightningAddress?.()?.trim();
+        if (!address) return;
+        try {
+            await navigator.clipboard.writeText(address);
+            showSuccess('Lightning Address copied');
+        } catch {
+            showError('Could not copy Lightning Address');
+        }
+    });
+
+    addressSaveBtn?.addEventListener('click', () => {
+        const canvas = document.getElementById('receive-lightning-address-qr') as HTMLCanvasElement | null;
+        const address = callbacks?.getLightningAddress?.()?.trim();
+        if (!canvas || !address) return;
+        const link = document.createElement('a');
+        link.download = `zaparc-${address.replace(/[^a-z0-9_-]+/gi, '-')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showSuccess('Lightning Address QR saved');
+    });
 
     document.querySelectorAll('.quick-amount-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {

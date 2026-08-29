@@ -2535,6 +2535,54 @@ body.modal-open {
   margin-bottom: 0;
 }
 
+.receive-lightning-address-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.receive-lightning-address-heading {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.receive-lightning-address-qr-wrap {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+#receive-lightning-address-qr {
+  display: block;
+  width: 156px;
+  height: 156px;
+}
+
+.receive-lightning-address-text {
+  margin-top: 9px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.receive-lightning-address-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.receive-lightning-address-actions .btn-secondary {
+  margin: 0;
+}
+
 /* Professional Card Styling for Deposit/Withdraw */
 
 /* Deposit step containers */

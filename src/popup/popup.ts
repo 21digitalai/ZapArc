@@ -3506,7 +3506,8 @@ function setupModuleCallbacks(): void {
     // Setup deposit callbacks
     setDepositCallbacks({
         updateBalanceDisplay,
-        loadTransactionHistory
+        loadTransactionHistory,
+        getLightningAddress: () => currentLightningAddressInfo?.lightningAddress || null
     });
 
     // Setup withdrawal callbacks
