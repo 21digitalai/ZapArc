@@ -2565,29 +2565,61 @@ body.modal-open {
 }
 
 .receive-lightning-address-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 9px;
+  padding: 7px 10px;
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  border-radius: 8px;
+}
+
+.receive-lightning-address-icon {
+  flex-shrink: 0;
+  font-size: 12px;
 }
 
 .receive-lightning-address-text {
-  width: 100%;
+  flex: 1;
   min-width: 0;
   box-sizing: border-box;
-  padding: 9px 10px;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-input);
-  background: var(--input-bg);
-  color: var(--text-secondary);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--brand, #FFC107);
   font-size: 12px;
   font-weight: 600;
-  font-family: inherit;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.receive-lightning-address-row .btn-secondary {
-  width: auto;
-  margin: 0;
+.receive-lightning-address-copy {
+  flex-shrink: 0;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.receive-lightning-address-copy:hover {
+  opacity: 1;
+}
+
+.receive-lightning-address-copy:active {
+  transform: scale(0.92);
+}
+
+.receive-lightning-address-copy:focus-visible {
+  outline: 2px solid var(--brand, #FFC107);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
 .receive-lightning-address-save {
