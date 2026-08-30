@@ -37,6 +37,20 @@ export function clearWalletDisplay(): void {
         balanceElement.textContent = '-- sats';
     }
 
+    // Fiat belongs to the exact wallet + sub-wallet balance. Always clear it
+    // together with sats so creation/switch paths cannot retain another
+    // wallet's estimate while the new SDK connection is loading.
+    const balanceFiatElement = document.getElementById('balance-fiat');
+    if (balanceFiatElement) {
+        balanceFiatElement.textContent = '';
+        balanceFiatElement.classList.add('hidden');
+    }
+
+    const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
+    if (withdrawBalanceElement) {
+        withdrawBalanceElement.textContent = '—';
+    }
+
     // Clear transactions
     const transactionList = document.getElementById('transaction-list');
     if (transactionList) {
