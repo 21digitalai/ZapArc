@@ -178,6 +178,7 @@ async function getActiveWalletId(): Promise<string | null> {
 }
 
 import { getUserFiatCurrency, getDisplayCurrency, setFiatCurrencyCache, persistFiatCurrency } from './currency-pref';
+import { walletSwitchBalancePresentation } from './balance-presentation';
 
 /** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
 function walletCacheKey(prefix: string, walletId: string, subIndex?: number): string {
@@ -3589,14 +3590,32 @@ async function initializePopup() {
                     // Show main interface
                     restoreMainInterface();
 
-                    // Load cached balance immediately for instant UI
-                    const hasCachedBalance = storageData.cachedBalance !== undefined && storageData.cachedBalance !== null;
+                    // Load only the active wallet's cache. In multi-wallet mode the legacy
+                    // global cache may belong to a different wallet and must not be reused.
+                    let activeCachedBalance = storageData.cachedBalance;
+                    let activeWalletCacheKey: string | null = null;
+                    const activeWalletData = await chrome.storage.local.get(['multiWalletData']);
+                    if (activeWalletData.multiWalletData) {
+                        try {
+                            const mwd = JSON.parse(activeWalletData.multiWalletData);
+                            if (mwd.activeWalletId) {
+                                activeWalletCacheKey = walletCacheKey('cachedBalance', mwd.activeWalletId, mwd.activeSubWalletIndex || 0);
+                                const scopedCache = await chrome.storage.local.get([activeWalletCacheKey]);
+                                activeCachedBalance = scopedCache[activeWalletCacheKey];
+                            }
+                        } catch (error) {
+                            console.warn('[Popup] Failed to resolve wallet-scoped balance cache:', error);
+                            activeCachedBalance = undefined;
+                        }
+                    }
+
+                    const hasCachedBalance = activeCachedBalance !== undefined && activeCachedBalance !== null;
                     if (hasCachedBalance) {
-                        console.log('💾 [Popup] Using cached balance:', storageData.cachedBalance);
-                        setCurrentBalance(storageData.cachedBalance);
+                        console.log('💾 [Popup] Using wallet-scoped cached balance:', activeCachedBalance);
+                        setCurrentBalance(activeCachedBalance);
                         const balanceElement = document.getElementById('balance');
                         if (balanceElement) {
-                            balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
+                            balanceElement.textContent = `${activeCachedBalance.toLocaleString()} sats`;
                         }
 
                         // Show cached fiat estimate immediately (then reconcile with selected currency)
@@ -3613,13 +3632,16 @@ async function initializePopup() {
                                     }
                                 }
 
-                                const fiatCacheData = await chrome.storage.local.get([fiatCacheKey, 'cachedBalanceFiat']);
-                                const fiatCache = fiatCacheData[fiatCacheKey] || fiatCacheData.cachedBalanceFiat;
+                                const fiatCacheData = await chrome.storage.local.get([fiatCacheKey]);
+                                const fiatCache = fiatCacheData[fiatCacheKey];
 
                                 // Immediate paint: if sats match, show cached fiat right away (fiat display modes only)
-                                if (fiatCache && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display && fiatCache.currency !== 'sats') {
+                                if (fiatCache && fiatCache.balanceSats === activeCachedBalance && fiatCache.display && fiatCache.currency !== 'sats') {
                                     balanceFiatElement.textContent = fiatCache.display;
                                     balanceFiatElement.classList.remove('hidden');
+                                } else {
+                                    balanceFiatElement.textContent = '';
+                                    balanceFiatElement.classList.add('hidden');
                                 }
 
                                 // Background reconcile: if cached currency differs from selected, refresh display
@@ -3631,7 +3653,7 @@ async function initializePopup() {
                                     }
 
                                     if (!fiatCache || fiatCache.currency !== selectedCurrency || !fiatCache.display) {
-                                        const fiatAmount = await satsToFiat(storageData.cachedBalance, selectedCurrency);
+                                        const fiatAmount = await satsToFiat(activeCachedBalance, selectedCurrency);
                                         if (fiatAmount !== null) {
                                             balanceFiatElement.textContent = formatFiat(fiatAmount, selectedCurrency);
                                             balanceFiatElement.classList.remove('hidden');
@@ -3644,7 +3666,7 @@ async function initializePopup() {
                         // Also update withdraw balance if visible
                         const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
                         if (withdrawBalanceElement) {
-                            withdrawBalanceElement.textContent = storageData.cachedBalance.toLocaleString();
+                            withdrawBalanceElement.textContent = activeCachedBalance.toLocaleString();
                         }
                     } else {
                         console.log('⚠️ [Popup] No cached balance found - will fetch from SDK');
@@ -3779,6 +3801,21 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         const switchedWalletId = customEvent.detail.masterKeyId;
         let shownCachedTx = false;
 
+        // Clear the previous wallet's complete balance presentation first. In
+        // particular, never leave its fiat estimate visible during reconnection.
+        const balanceElement = document.getElementById('balance');
+        const balanceFiatElement = document.getElementById('balance-fiat');
+        const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
+        const emptyPresentation = walletSwitchBalancePresentation(undefined);
+        setCurrentBalance(emptyPresentation.balanceSats);
+        if (balanceElement) balanceElement.textContent = emptyPresentation.balanceText;
+        if (balanceFiatElement) {
+            balanceFiatElement.textContent = emptyPresentation.fiatText;
+            balanceFiatElement.classList.add('hidden');
+        }
+        if (withdrawBalanceElement) withdrawBalanceElement.textContent = '—';
+        setBalanceLoading(emptyPresentation.loading);
+
         // Cached balance — show instantly
         try {
             const balCacheKey = walletCacheKey('cachedBalance', switchedWalletId, customEvent.detail.subWalletIndex);
@@ -3786,11 +3823,11 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             const cachedBal = balData[balCacheKey];
             if (cachedBal !== undefined && cachedBal !== null) {
                 console.log(`💰 [Popup] Showing cached balance for ${switchedWalletId}: ${cachedBal}`);
-                setCurrentBalance(cachedBal);
-                const balanceElement = document.getElementById('balance');
-                if (balanceElement) balanceElement.textContent = `${cachedBal.toLocaleString()} sats`;
-                const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
+                const cachedPresentation = walletSwitchBalancePresentation(cachedBal);
+                setCurrentBalance(cachedPresentation.balanceSats);
+                if (balanceElement) balanceElement.textContent = cachedPresentation.balanceText;
                 if (withdrawBalanceElement) withdrawBalanceElement.textContent = cachedBal.toLocaleString();
+                setBalanceLoading(cachedPresentation.loading);
             }
         } catch (e) { /* ignore */ }
 
