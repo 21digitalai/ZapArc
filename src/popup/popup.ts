@@ -1039,7 +1039,20 @@ function showTransactionDetail(tx: StoredTransaction): void {
             showSuccess('Clipboard was unavailable. Support logs downloaded as JSON instead.');
         }
     };
-    const payment = tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined;
+    // Native Breez 0.23.x payments contain bigint fields and therefore cannot be
+    // stored in chrome.storage. Rebuild the correlation context from the safe
+    // transaction fields when this detail view came from the persisted cache.
+    const payment = (tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined) || {
+        id: tx.id,
+        timestamp: tx.timestamp,
+        paymentHash: tx.paymentHash,
+        bolt11: tx.bolt11,
+        status: tx.status,
+        paymentType: tx.type,
+        amount: tx.amount,
+        fees: tx.feeSats,
+        method: tx.method,
+    };
     const sdkLogsButton = document.getElementById('tx-copy-sdk-logs') as HTMLButtonElement | null;
     if (sdkLogsButton) sdkLogsButton.addEventListener('click', () => {
         copyExportText(

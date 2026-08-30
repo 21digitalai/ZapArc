@@ -15,6 +15,20 @@ const TRUE_SECRET_PATTERNS: RegExp[] = [
 ];
 const SUPPORT_IDENTIFIER_KEYS = /(?:^|_)(?:id|invoice|payment_hash|destination_pubkey|address|lnurl)(?:$|_)/i;
 
+export interface PaymentLogCorrelation {
+    id?: string;
+    timestamp?: number | bigint;
+    paymentHash?: string;
+    bolt11?: string;
+    invoice?: string;
+    status?: string;
+    paymentType?: string;
+    type?: string;
+    amount?: number | bigint;
+    fees?: number | bigint;
+    details?: unknown;
+}
+
 function removeTrueSecrets(value: string): string {
     return TRUE_SECRET_PATTERNS.reduce((result, pattern) => result.replace(pattern, match => {
         const separator = match.includes('=') ? '=' : ':';
@@ -117,14 +131,14 @@ export function buildSupportExport(payment: Payment | undefined, balanceSats: nu
     );
 }
 
-function paymentTimestampMs(payment?: Payment): number | undefined {
+function paymentTimestampMs(payment?: PaymentLogCorrelation): number | undefined {
     if (!payment) return undefined;
     const value = Number(payment.timestamp);
     if (!Number.isFinite(value) || value <= 0) return undefined;
     return value < 10_000_000_000 ? value * 1000 : value;
 }
 
-function collectPaymentCorrelationValues(payment?: Payment): string[] {
+function collectPaymentCorrelationValues(payment?: PaymentLogCorrelation): string[] {
     if (!payment) return [];
     const values = new Set<string>();
     const visit = (value: unknown, key = ''): void => {
@@ -150,7 +164,7 @@ function collectPaymentCorrelationValues(payment?: Payment): string[] {
  * identifiers, invoices, addresses, pubkeys and paths are preserved. Only
  * credential patterns removed at ingestion time remain unavailable.
  */
-export function buildSdkLogsExport(payment: Payment | undefined, now = new Date()): string {
+export function buildSdkLogsExport(payment: PaymentLogCorrelation | undefined, now = new Date()): string {
     const generatedAt = now.toISOString();
     const nowMs = now.getTime();
     const windowMs = 15 * 60 * 1000;

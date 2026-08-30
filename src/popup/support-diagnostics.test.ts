@@ -67,4 +67,24 @@ describe('support diagnostics', () => {
         expect(parsed.paymentTimeWindowAvailable).toBe(true);
         expect(parsed.paymentTimeWindowLogs.some((entry: SdkSupportLog) => entry.line.includes('starting wallet sync'))).toBe(true);
     });
+
+    it('preserves transaction correlation when the raw Breez payment was omitted from Chrome storage', () => {
+        const now = new Date('2026-08-30T12:47:37.000Z');
+        const paymentAt = new Date('2026-08-30T12:47:30.000Z');
+        recordSdkLog('DEBUG', 'payment 01a052a2-2cd9-72f3-bb09-3fdf173a278a reconciled', paymentAt);
+
+        const parsed = JSON.parse(buildSdkLogsExport({
+            id: '01a052a2-2cd9-72f3-bb09-3fdf173a278a',
+            timestamp: paymentAt.getTime(),
+            paymentHash: '4031af93283e10c9ce0639c343daaef1446fb1a4815455c2a7622ab0d1303595',
+            status: 'completed',
+            paymentType: 'receive',
+            amount: 16,
+        }, now));
+
+        expect(parsed.correlation.paymentId).toBe('01a052a2-2cd9-72f3-bb09-3fdf173a278a');
+        expect(parsed.correlation.paymentTimestamp).toBe(paymentAt.toISOString());
+        expect(parsed.correlation.exactPaymentLogMatchAvailable).toBe(true);
+        expect(parsed.exactPaymentLogs).toHaveLength(1);
+    });
 });
