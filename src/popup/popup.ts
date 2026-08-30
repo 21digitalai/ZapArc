@@ -1020,7 +1020,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
     });
 
     const copyExport = async (detailed: boolean): Promise<void> => {
-        await copyToClipboard(buildSupportExport(tx.rawPayment, currentBalance, detailed));
+        await copyToClipboard(buildSupportExport(tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined, currentBalance, detailed));
         showSuccess(detailed ? 'Detailed support export copied.' : 'Sanitized support export copied.');
     };
     const sanitizedButton = document.getElementById('tx-copy-support');
