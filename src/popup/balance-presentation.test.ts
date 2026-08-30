@@ -21,5 +21,26 @@ describe('wallet balance presentation', () => {
             loading: false,
         });
     });
-});
 
+    it('shows the matching wallet-scoped fiat estimate immediately', () => {
+        expect(walletSwitchBalancePresentation(22_831, {
+            currency: 'usd',
+            balanceSats: 22_831,
+            display: '$20.01',
+        }, 'usd')).toEqual({
+            balanceSats: 22_831,
+            balanceText: '22,831 sats',
+            fiatText: '$20.01',
+            showFiat: true,
+            loading: false,
+        });
+    });
+
+    it('rejects a fiat estimate belonging to another balance or currency', () => {
+        expect(walletSwitchBalancePresentation(15, {
+            currency: 'usd',
+            balanceSats: 22_831,
+            display: '$20.01',
+        }, 'eur').showFiat).toBe(false);
+    });
+});

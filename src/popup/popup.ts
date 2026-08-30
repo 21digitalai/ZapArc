@@ -153,6 +153,9 @@ interface StoredTransaction {
 }
 
 let storedTransactions: StoredTransaction[] = [];
+// Invalidates balance reads started by a wallet/sub-wallet that is no longer
+// active. An old SDK getInfo() must never paint or cache its balance after a switch.
+let balanceRefreshGeneration = 0;
 
 function getTransactionEmptyStateHtml(message: string = 'No transactions yet', subtitle: string = 'Send or receive your first payment'): string {
     return `<div class="no-transactions"><div class="empty-icon">⚡</div><div class="empty-title">${message}</div><div class="empty-subtitle">${subtitle}</div></div>`;
@@ -411,13 +414,16 @@ function setBalanceLoading(loading: boolean): void {
 async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
     console.log('🔍 [Popup] Updating balance display...');
 
+    const refreshGeneration = balanceRefreshGeneration;
+    const refreshSdk = breezSDK;
+
     const balanceElement = document.getElementById('balance');
     const balanceFiatElement = document.getElementById('balance-fiat');
     const shouldShowLoader = balanceElement?.textContent?.includes('--') ?? false;
     if (shouldShowLoader) setBalanceLoading(true);
 
     try {
-        if (!breezSDK) {
+        if (!refreshSdk) {
             console.warn('[Popup] SDK not connected - cannot update balance');
             setBalanceLoading(false);
             return;
@@ -428,11 +434,29 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
         const shouldClaim = forceClaimCheck || (now - lastDepositClaimCheckAt > DEPOSIT_CLAIM_CHECK_INTERVAL_MS);
         if (shouldClaim) {
             lastDepositClaimCheckAt = now;
-            void claimPendingDepositsNow(breezSDK, forceClaimCheck ? 'manual refresh' : 'periodic balance refresh');
+            void claimPendingDepositsNow(refreshSdk, forceClaimCheck ? 'manual refresh' : 'periodic balance refresh');
+        }
+
+        const walletContextResult = await chrome.storage.local.get(['multiWalletData']);
+        let walletContext: { walletId: string; subIndex: number } | null = null;
+        if (walletContextResult.multiWalletData) {
+            try {
+                const mwd = JSON.parse(walletContextResult.multiWalletData);
+                if (mwd.activeWalletId) {
+                    walletContext = {
+                        walletId: mwd.activeWalletId,
+                        subIndex: mwd.activeSubWalletIndex || 0,
+                    };
+                }
+            } catch (_) { /* legacy single-wallet mode */ }
         }
 
         // Get fresh balance from SDK (ensure synced for accurate total)
-        const walletInfo = await breezSDK.getInfo({ ensureSynced: true });
+        const walletInfo = await refreshSdk.getInfo({ ensureSynced: true });
+        if (refreshGeneration !== balanceRefreshGeneration || refreshSdk !== breezSDK) {
+            console.log('[Popup] Ignoring balance returned by an inactive wallet context');
+            return;
+        }
         const balance = walletInfo?.balanceSats || 0;
 
         console.log('💰 [Popup] Fresh balance from SDK:', balance);
@@ -464,13 +488,8 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
                         }
                     };
                     try {
-                        const mw = await chrome.storage.local.get(['multiWalletData']);
-                        if (mw.multiWalletData) {
-                            const mwd = JSON.parse(mw.multiWalletData);
-                            if (mwd.activeWalletId) {
-                                const subIdx = mwd.activeSubWalletIndex || 0;
-                                fiatCacheUpdate[walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx)] = fiatCacheUpdate.cachedBalanceFiat;
-                            }
+                        if (walletContext) {
+                            fiatCacheUpdate[walletCacheKey('cachedBalanceFiat', walletContext.walletId, walletContext.subIndex)] = fiatCacheUpdate.cachedBalanceFiat;
                         }
                         await chrome.storage.local.set(fiatCacheUpdate);
                     } catch (e) { /* ignore cache errors */ }
@@ -491,15 +510,8 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
 
         // Cache balance for faster loading next time (wallet-specific + legacy key)
         const balanceCacheUpdate: Record<string, any> = { cachedBalance: balance };
-        const mwResult = await chrome.storage.local.get(['multiWalletData']);
-        if (mwResult.multiWalletData) {
-            try {
-                const mwd = JSON.parse(mwResult.multiWalletData);
-                if (mwd.activeWalletId) {
-                    const subIdx = mwd.activeSubWalletIndex || 0;
-                    balanceCacheUpdate[walletCacheKey('cachedBalance', mwd.activeWalletId, subIdx)] = balance;
-                }
-            } catch (e) { /* ignore */ }
+        if (walletContext) {
+            balanceCacheUpdate[walletCacheKey('cachedBalance', walletContext.walletId, walletContext.subIndex)] = balance;
         }
         await chrome.storage.local.set(balanceCacheUpdate);
 
@@ -3797,6 +3809,9 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
     });
 
     try {
+        // Cancel any balance request still running against the previously active SDK.
+        balanceRefreshGeneration += 1;
+
         // Show cached balance + transactions IMMEDIATELY before SDK work
         const switchedWalletId = customEvent.detail.masterKeyId;
         let shownCachedTx = false;
@@ -3819,13 +3834,23 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         // Cached balance — show instantly
         try {
             const balCacheKey = walletCacheKey('cachedBalance', switchedWalletId, customEvent.detail.subWalletIndex);
-            const balData = await chrome.storage.local.get([balCacheKey]);
+            const fiatCacheKey = walletCacheKey('cachedBalanceFiat', switchedWalletId, customEvent.detail.subWalletIndex);
+            const balData = await chrome.storage.local.get([balCacheKey, fiatCacheKey]);
             const cachedBal = balData[balCacheKey];
             if (cachedBal !== undefined && cachedBal !== null) {
                 console.log(`💰 [Popup] Showing cached balance for ${switchedWalletId}: ${cachedBal}`);
-                const cachedPresentation = walletSwitchBalancePresentation(cachedBal);
+                const selectedCurrency = await getDisplayCurrency();
+                const cachedPresentation = walletSwitchBalancePresentation(
+                    cachedBal,
+                    balData[fiatCacheKey],
+                    selectedCurrency,
+                );
                 setCurrentBalance(cachedPresentation.balanceSats);
                 if (balanceElement) balanceElement.textContent = cachedPresentation.balanceText;
+                if (balanceFiatElement) {
+                    balanceFiatElement.textContent = cachedPresentation.fiatText;
+                    balanceFiatElement.classList.toggle('hidden', !cachedPresentation.showFiat);
+                }
                 if (withdrawBalanceElement) withdrawBalanceElement.textContent = cachedBal.toLocaleString();
                 setBalanceLoading(cachedPresentation.loading);
             }
