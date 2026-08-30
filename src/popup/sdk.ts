@@ -19,6 +19,7 @@ import { hideBalanceLoading } from './ui-helpers';
 import { showSuccess, showInfo } from './notifications';
 import * as bip39 from 'bip39';
 import { classifyClaimError, getClaimKey } from './onchain-claim-lifecycle';
+import { recordSdkLog } from './support-diagnostics';
 
 // BIP39 wordlist for sub-wallet derivation
 const BIP39_WORDLIST = bip39.wordlists.english;
@@ -41,6 +42,7 @@ const SPARK_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 
 class JsLogger {
     log = (l: LogEntry): void => {
+        recordSdkLog(l.level, l.line);
         console.log(`[BreezSDK ${l.level}] ${l.line}`);
     };
 }

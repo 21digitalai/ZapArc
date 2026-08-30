@@ -37,7 +37,8 @@ import {
 } from './state';
 
 // SDK imports
-import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow } from './sdk';
+import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
+import { buildSupportExport } from './support-diagnostics';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -150,6 +151,7 @@ interface StoredTransaction {
     claimMessage?: string;
     requiredConfirmations?: number;
     comment?: string;
+    rawPayment?: unknown;
 }
 
 let storedTransactions: StoredTransaction[] = [];
@@ -664,6 +666,7 @@ async function loadTransactionHistory() {
                 confirmations: typeof confirmations === 'number' ? confirmations : undefined,
                 vout: typeof (payment.details?.vout ?? payment.vout) === 'number' ? (payment.details?.vout ?? payment.vout) : undefined,
                 comment: senderComment || extractLnurlPaymentComment(payment),
+                rawPayment: payment,
             } as StoredTransaction;
         }));
 
@@ -959,6 +962,12 @@ function showTransactionDetail(tx: StoredTransaction): void {
         <div class="tx-detail-rows">
             ${detailRows}
         </div>
+        <div class="tx-diagnostics-actions">
+            <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. It does not upload support data.</p>
+            <button class="tx-diagnostics-btn" id="tx-check-status">Check payment status</button>
+            <button class="tx-diagnostics-btn" id="tx-copy-support">Copy SDK support logs (sanitized)</button>
+            <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-detailed">Show detailed export warning</button>
+        </div>
     `;
 
     // Async: populate secondary estimate for fiat display modes
@@ -991,6 +1000,39 @@ function showTransactionDetail(tx: StoredTransaction): void {
                 }, 2000);
             }
         });
+    });
+
+    const checkButton = document.getElementById('tx-check-status') as HTMLButtonElement | null;
+    if (checkButton) checkButton.addEventListener('click', async () => {
+        checkButton.disabled = true;
+        checkButton.textContent = 'Checking Breez…';
+        try {
+            const payment = await refreshPaymentStatus(tx.id);
+            tx.rawPayment = payment;
+            tx.status = String(payment.status || tx.status);
+            showSuccess('Payment status re-read from Breez.');
+            showTransactionDetail(tx);
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Could not check payment status');
+            checkButton.disabled = false;
+            checkButton.textContent = 'Check payment status';
+        }
+    });
+
+    const copyExport = async (detailed: boolean): Promise<void> => {
+        await copyToClipboard(buildSupportExport(tx.rawPayment, currentBalance, detailed));
+        showSuccess(detailed ? 'Detailed support export copied.' : 'Sanitized support export copied.');
+    };
+    const sanitizedButton = document.getElementById('tx-copy-support');
+    if (sanitizedButton) sanitizedButton.addEventListener('click', () => { copyExport(false).catch(error => showError(String(error))); });
+    const detailedButton = document.getElementById('tx-copy-detailed') as HTMLButtonElement | null;
+    if (detailedButton) detailedButton.addEventListener('click', () => {
+        if (detailedButton.dataset.confirmed !== 'true') {
+            detailedButton.dataset.confirmed = 'true';
+            detailedButton.textContent = 'Copy detailed logs — may include invoices and identifiers';
+            return;
+        }
+        copyExport(true).catch(error => showError(String(error)));
     });
 
     // Show modal
