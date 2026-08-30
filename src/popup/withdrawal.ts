@@ -11,7 +11,7 @@ import {
 import { isExistingContact, openContactModalWithAddress, openContactPicker, showContactsInterface } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, formatSelectedCurrencyAmount, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
-import { getUserFiatCurrency, getDisplayCurrency, type DisplayCurrency } from './currency-pref';
+import { getUserFiatCurrency, type DisplayCurrency } from './currency-pref';
 import { nonblankPaymentComment, preparedPaymentComment, savePaymentComment } from './payment-comment';
 
 export type WithdrawalCallbacks = {
@@ -35,11 +35,29 @@ let preparedCommentAtPreview: string | undefined;
 // Currency toggle state for send amount input
 let sendInputCurrency: DisplayCurrency = 'sats';
 let userFiatCurrency: FiatCurrency = 'usd';
+const SEND_INPUT_CURRENCY_KEY = 'send_input_currency';
 
-/** Load currency preferences from shared cache */
+/** Load the user's fiat unit plus Send's independent amount-input preference. */
 async function loadFiatCurrencySetting(): Promise<void> {
     userFiatCurrency = await getUserFiatCurrency();
-    sendInputCurrency = await getDisplayCurrency();
+    try {
+        const stored = await chrome.storage.local.get([SEND_INPUT_CURRENCY_KEY]);
+        const value = stored?.[SEND_INPUT_CURRENCY_KEY];
+        sendInputCurrency = value === 'usd' || value === 'eur' || value === 'sats'
+            ? value
+            : 'sats';
+    } catch (error) {
+        console.warn('[Withdrawal] Failed to load send currency preference:', error);
+        sendInputCurrency = 'sats';
+    }
+}
+
+async function persistSendCurrencySetting(currency: DisplayCurrency): Promise<void> {
+    try {
+        await chrome.storage.local.set({ [SEND_INPUT_CURRENCY_KEY]: currency });
+    } catch (error) {
+        console.warn('[Withdrawal] Failed to save send currency preference:', error);
+    }
 }
 
 /** Update the currency selector value and conversion hint */
@@ -393,6 +411,7 @@ export function setupWithdrawalListeners(): void {
         }
 
         sendInputCurrency = nextCurrency;
+        void persistSendCurrencySetting(nextCurrency);
 
         const amtInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
         if (amtInput) amtInput.value = ''; // clear on currency change to avoid confusion
