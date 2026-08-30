@@ -19,7 +19,7 @@ import {
     getBtcSpotPrice,
     type FiatCurrency
 } from '../utils/currency';
-import { getDisplayCurrency, getUserFiatCurrency } from './currency-pref';
+import { getUserFiatCurrency } from './currency-pref';
 import { classifyClaimError, getClaimKey, upsertProvisionalClaim, type ClaimRow } from './onchain-claim-lifecycle';
 import { ExtensionMessaging } from '../utils/messaging';
 import { DEFAULT_INVOICE_EXPIRY_SECS, getBolt11ExpiryTime } from '../utils/invoice-expiry';
@@ -28,15 +28,29 @@ type ReceiveInputCurrency = 'sats' | FiatCurrency;
 
 let receiveInputCurrency: ReceiveInputCurrency = 'sats';
 let receiveDefaultFiat: FiatCurrency = 'usd';
+const RECEIVE_INPUT_CURRENCY_KEY = 'receive_input_currency';
 
 async function loadReceiveCurrencySetting(): Promise<void> {
-    const [displayCurrency, preferredFiat] = await Promise.all([
-        getDisplayCurrency(),
-        getUserFiatCurrency(),
-    ]);
-    receiveInputCurrency = displayCurrency;
-    receiveDefaultFiat = preferredFiat;
+    receiveDefaultFiat = await getUserFiatCurrency();
+    try {
+        const stored = await chrome.storage.local.get([RECEIVE_INPUT_CURRENCY_KEY]);
+        const value = stored?.[RECEIVE_INPUT_CURRENCY_KEY];
+        receiveInputCurrency = value === 'usd' || value === 'eur' || value === 'sats'
+            ? value
+            : 'sats';
+    } catch (error) {
+        console.warn('[Deposit] Failed to load receive currency preference:', error);
+        receiveInputCurrency = 'sats';
+    }
     updateReceiveCurrencyUI();
+}
+
+async function persistReceiveCurrencySetting(currency: ReceiveInputCurrency): Promise<void> {
+    try {
+        await chrome.storage.local.set({ [RECEIVE_INPUT_CURRENCY_KEY]: currency });
+    } catch (error) {
+        console.warn('[Deposit] Failed to save receive currency preference:', error);
+    }
 }
 
 function updateReceiveCurrencyUI(): void {
@@ -618,6 +632,7 @@ export function setupDepositListeners(): void {
         const nextCurrency = currencySelect.value as ReceiveInputCurrency;
         if (nextCurrency !== 'sats' && nextCurrency !== 'usd' && nextCurrency !== 'eur') return;
         receiveInputCurrency = nextCurrency;
+        void persistReceiveCurrencySetting(nextCurrency);
         if (depositAmount) depositAmount.value = '';
         updateReceiveCurrencyUI();
         updateDepositEstimate(0);
