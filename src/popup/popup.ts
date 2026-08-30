@@ -38,7 +38,7 @@ import {
 
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
-import { buildSdkLogsExport, buildSupportExport } from './support-diagnostics';
+import { buildSdkLogsExport } from './support-diagnostics';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -971,7 +971,6 @@ function showTransactionDetail(tx: StoredTransaction): void {
         <div class="tx-diagnostics-actions">
             <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. It does not upload support data.</p>
             <button class="tx-diagnostics-btn" id="tx-check-status">Check payment status</button>
-            <button class="tx-diagnostics-btn" id="tx-copy-diagnostics">Copy payment diagnostics</button>
             <button class="tx-diagnostics-btn" id="tx-copy-support">Copy SDK support logs (sanitized)</button>
             <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-detailed">Show detailed export warning</button>
         </div>
@@ -1042,14 +1041,6 @@ function showTransactionDetail(tx: StoredTransaction): void {
         }
     };
     const payment = tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined;
-    const diagnosticsButton = document.getElementById('tx-copy-diagnostics');
-    if (diagnosticsButton) diagnosticsButton.addEventListener('click', () => {
-        copyExportText(
-            buildSupportExport(payment, currentBalance, false),
-            'Payment diagnostics copied.',
-            'payment-diagnostics',
-        ).catch(error => showError(String(error)));
-    });
     const sanitizedButton = document.getElementById('tx-copy-support');
     if (sanitizedButton) sanitizedButton.addEventListener('click', () => {
         copyExportText(
