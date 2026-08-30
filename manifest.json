@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ZapArc — Self-Custodial Bitcoin Wallet",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Self-custodial Bitcoin wallet with Lightning and on-chain support, powered by Breez SDK.",
   "icons": {
     "16": "icons/icon16.png",
