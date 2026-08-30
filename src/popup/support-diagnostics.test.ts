@@ -29,7 +29,7 @@ describe('support diagnostics', () => {
         expect(buildSupportExport(payment, 10, true)).toContain('"amount": "999"');
     });
 
-    it('creates meaningfully distinct sanitized and detailed SDK log exports', () => {
+    it('creates one full SDK log export with payment correlation context', () => {
         const now = new Date('2026-08-30T12:00:00.000Z');
         recordSdkLog('ERROR', 'payment id=secret-payment invoice=lnbc123 failed', now);
         const payment = {
@@ -43,16 +43,13 @@ describe('support diagnostics', () => {
             details: { type: 'lightning' },
         } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
 
-        const sanitized = buildSdkLogsExport(payment, false, now);
-        const detailed = buildSdkLogsExport(payment, true, now);
-        expect(sanitized).toContain('"exportType": "sanitized-sdk-support-logs"');
-        expect(sanitized).not.toContain('secret-payment');
-        expect(detailed).toContain('"exportType": "detailed-sdk-support-logs"');
-        expect(detailed).toContain('secret-payment');
-        expect(detailed).toContain('"exactPaymentLogMatchAvailable": true');
-        expect(detailed).toContain('"exactPaymentLogs"');
-        expect(detailed).toContain('"paymentTimeWindowLogs"');
-        expect(detailed.length).toBeGreaterThan(sanitized.length);
+        const output = buildSdkLogsExport(payment, now);
+        expect(output).toContain('"exportType": "sdk-support-logs"');
+        expect(output).toContain('secret-payment');
+        expect(output).toContain('"sanitized": false');
+        expect(output).toContain('"exactPaymentLogMatchAvailable": true');
+        expect(output).toContain('"exactPaymentLogs"');
+        expect(output).toContain('"paymentTimeWindowLogs"');
     });
 
     it('does not claim unrelated time-window logs are exact payment logs', () => {
@@ -64,7 +61,7 @@ describe('support diagnostics', () => {
             timestamp: Math.floor(paymentAt.getTime() / 1000), method: 'lightning', details: { type: 'lightning' },
         } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
 
-        const parsed = JSON.parse(buildSdkLogsExport(payment, true, new Date('2026-08-30T12:39:52.000Z')));
+        const parsed = JSON.parse(buildSdkLogsExport(payment, new Date('2026-08-30T12:39:52.000Z')));
         expect(parsed.correlation.exactPaymentLogMatchAvailable).toBe(false);
         expect(parsed.exactPaymentLogs).toEqual([]);
         expect(parsed.paymentTimeWindowAvailable).toBe(true);

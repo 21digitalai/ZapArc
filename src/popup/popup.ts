@@ -971,8 +971,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
         <div class="tx-diagnostics-actions">
             <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. It does not upload support data.</p>
             <button class="tx-diagnostics-btn" id="tx-check-status">Check payment status</button>
-            <button class="tx-diagnostics-btn" id="tx-copy-support">Copy SDK support logs (sanitized)</button>
-            <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-detailed">Show detailed export warning</button>
+            <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-sdk-logs">Copy SDK logs</button>
         </div>
     `;
 
@@ -1041,25 +1040,17 @@ function showTransactionDetail(tx: StoredTransaction): void {
         }
     };
     const payment = tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined;
-    const sanitizedButton = document.getElementById('tx-copy-support');
-    if (sanitizedButton) sanitizedButton.addEventListener('click', () => {
-        copyExportText(
-            buildSdkLogsExport(payment, false),
-            'Sanitized SDK support logs copied.',
-            'sdk-support-logs',
-        ).catch(error => showError(String(error)));
-    });
-    const detailedButton = document.getElementById('tx-copy-detailed') as HTMLButtonElement | null;
-    if (detailedButton) detailedButton.addEventListener('click', () => {
-        if (detailedButton.dataset.confirmed !== 'true') {
-            detailedButton.dataset.confirmed = 'true';
-            detailedButton.textContent = 'Copy detailed logs — may include invoices and identifiers';
+    const sdkLogsButton = document.getElementById('tx-copy-sdk-logs') as HTMLButtonElement | null;
+    if (sdkLogsButton) sdkLogsButton.addEventListener('click', () => {
+        if (sdkLogsButton.dataset.confirmed !== 'true') {
+            sdkLogsButton.dataset.confirmed = 'true';
+            sdkLogsButton.textContent = 'Copy full SDK logs — share only with trusted support';
             return;
         }
         copyExportText(
-            buildSdkLogsExport(payment, true),
-            'Detailed SDK support logs copied.',
-            'detailed-sdk-logs',
+            buildSdkLogsExport(payment),
+            'SDK logs copied.',
+            'sdk-logs',
         ).catch(error => showError(String(error)));
     });
 

@@ -146,12 +146,11 @@ function collectPaymentCorrelationValues(payment?: Payment): string[] {
 }
 
 /**
- * Export SDK logs as a support artifact, separately from payment diagnostics.
- * The sanitized variant removes correlation identifiers from log text. The
- * detailed, explicitly-approved variant preserves Breez context while true
- * secrets remain removed at ingestion time.
+ * Export the full retained Breez SDK context for support. Ordinary payment
+ * identifiers, invoices, addresses, pubkeys and paths are preserved. Only
+ * credential patterns removed at ingestion time remain unavailable.
  */
-export function buildSdkLogsExport(payment: Payment | undefined, detailed: boolean, now = new Date()): string {
+export function buildSdkLogsExport(payment: Payment | undefined, now = new Date()): string {
     const generatedAt = now.toISOString();
     const nowMs = now.getTime();
     const windowMs = 15 * 60 * 1000;
@@ -162,14 +161,12 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
     const correlationValues = collectPaymentCorrelationValues(payment);
     const exactPaymentLogs = paymentTimeWindow.filter(entry => correlationValues.some(value => entry.line.includes(value)));
     const recentWindow = ring.filter(entry => Date.parse(entry.at) >= nowMs - windowMs);
-    const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => (
-        detailed ? sanitizeSupportValue(entry, false) : sanitizeSupportValue(entry, true)
-    ));
+    const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => sanitizeSupportValue(entry, false));
     const manifest = globalThis.chrome?.runtime?.getManifest?.();
 
     return JSON.stringify({
         schemaVersion: 1,
-        exportType: detailed ? 'detailed-sdk-support-logs' : 'sanitized-sdk-support-logs',
+        exportType: 'sdk-support-logs',
         generatedAt,
         app: {
             name: 'ZapArc Web',
@@ -178,7 +175,7 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
             platform: 'chrome-extension',
         },
         correlation: {
-            paymentId: detailed ? payment?.id || null : payment?.id ? '[REDACTED]' : null,
+            paymentId: payment?.id || null,
             paymentTimestamp: paymentAt === undefined ? null : new Date(paymentAt).toISOString(),
             windowMinutes: 15,
             mode: 'identifier-match-plus-time-window-context',
@@ -187,12 +184,8 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
                 ? 'Exact logs contain a payment identifier from the selected Breez payment. Time-window logs are broader wallet context.'
                 : 'No SDK log line containing an identifier from the selected payment was retained. Time-window logs are broader wallet context only.',
         },
-        retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: !detailed },
-        ...(detailed ? {
-            warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
-        } : {
-            redactions: ['payment identifiers', 'invoices', 'LNURLs', 'addresses and pubkeys'],
-        }),
+        retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: false },
+        warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
         exactPaymentLogs: prepareLogs(exactPaymentLogs),
         paymentTimeWindowAvailable: paymentTimeWindow.length > 0,
         paymentTimeWindowLogs: prepareLogs(paymentTimeWindow),
