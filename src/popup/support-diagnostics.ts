@@ -4,9 +4,11 @@ export interface SdkSupportLog {
     at: string;
     level: string;
     line: string;
+    sessionId?: string;
 }
 
-const MAX_LOGS = 250;
+const MAX_LOGS = 2_000;
+const MAX_PERSISTED_BYTES = 3 * 1024 * 1024;
 const STORAGE_KEY = 'zaparc_breez_support_logs_v1';
 const TRUE_SECRET_KEYS = /seed|mnemonic|private.?key|preimage|proof|api.?key|access.?token|refresh.?token|authorization/i;
 const TRUE_SECRET_PATTERNS: RegExp[] = [
@@ -54,6 +56,12 @@ function loadRing(): SdkSupportLog[] {
 }
 
 const ring: SdkSupportLog[] = loadRing();
+let activeSessionId: string | undefined;
+
+function trimRing(): void {
+    if (ring.length > MAX_LOGS) ring.splice(0, ring.length - MAX_LOGS);
+    while (ring.length > 1 && JSON.stringify(ring).length > MAX_PERSISTED_BYTES) ring.shift();
+}
 
 function persistRing(): void {
     try {
@@ -64,9 +72,20 @@ function persistRing(): void {
 }
 
 export function recordSdkLog(level: unknown, line: unknown, at: Date = new Date()): void {
-    ring.push({ at: at.toISOString(), level: String(level || 'INFO'), line: removeTrueSecrets(String(line || '')) });
-    if (ring.length > MAX_LOGS) ring.splice(0, ring.length - MAX_LOGS);
+    ring.push({
+        at: at.toISOString(),
+        level: String(level || 'INFO'),
+        line: removeTrueSecrets(String(line || '')),
+        ...(activeSessionId ? { sessionId: activeSessionId } : {}),
+    });
+    trimRing();
     persistRing();
+}
+
+export function beginSdkLogSession(at: Date = new Date()): string {
+    activeSessionId = `${at.toISOString()}-${Math.random().toString(36).slice(2, 10)}`;
+    recordSdkLog('INFO', 'ZapArc SDK wallet session started', at);
+    return activeSessionId;
 }
 
 export function recentSdkLogs(): SdkSupportLog[] {
@@ -186,6 +205,9 @@ export function buildSdkLogsExport(
     const correlationValues = collectPaymentCorrelationValues(payment);
     const exactPaymentLogs = paymentTimeWindow.filter(entry => correlationValues.some(value => entry.line.includes(value)));
     const recentWindow = ring.filter(entry => Date.parse(entry.at) >= nowMs - windowMs);
+    const currentSessionLogs = activeSessionId
+        ? ring.filter(entry => entry.sessionId === activeSessionId)
+        : [];
     const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => sanitizeSupportValue(entry, false));
     const manifest = globalThis.chrome?.runtime?.getManifest?.();
 
@@ -212,7 +234,14 @@ export function buildSdkLogsExport(
                 ? 'Exact logs contain a payment identifier from the selected Breez payment. Time-window logs are broader wallet context.'
                 : 'No SDK log line containing an identifier from the selected payment was retained. Time-window logs are broader wallet context only.',
         },
-        retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: false },
+        retention: {
+            maxEntries: MAX_LOGS,
+            maxPersistedBytes: MAX_PERSISTED_BYTES,
+            retainedEntries: ring.length,
+            persisted: true,
+            sanitized: false,
+            note: 'The full bounded SDK history is included so wallet import/recovery and historical resync evidence is not discarded merely because it does not match the selected payment.',
+        },
         warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
         breez: {
             paymentSnapshot: nativePayment || null,
@@ -233,5 +262,7 @@ export function buildSdkLogsExport(
         paymentTimeWindowAvailable: paymentTimeWindow.length > 0,
         paymentTimeWindowLogs: prepareLogs(paymentTimeWindow),
         recentWindowLogs: prepareLogs(recentWindow),
+        currentSdkSessionLogs: prepareLogs(currentSessionLogs),
+        fullRetainedSdkLogs: prepareLogs(ring),
     }, false), (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
 }

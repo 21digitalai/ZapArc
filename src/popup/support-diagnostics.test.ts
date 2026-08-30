@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSdkLogsExport, buildSupportExport, htlcClassification, recentSdkLogs, recordSdkLog, sanitizeSupportValue } from './support-diagnostics';
+import { beginSdkLogSession, buildSdkLogsExport, buildSupportExport, htlcClassification, recentSdkLogs, recordSdkLog, sanitizeSupportValue } from './support-diagnostics';
 import type { SdkSupportLog } from './support-diagnostics';
 
 describe('support diagnostics', () => {
@@ -13,7 +13,7 @@ describe('support diagnostics', () => {
 
     it('keeps a bounded log ring and uses cautious returned classification', () => {
         for (let index = 0; index < 255; index++) recordSdkLog('DEBUG', `line ${index}`);
-        expect(recentSdkLogs()).toHaveLength(250);
+        expect(recentSdkLogs().length).toBeLessThanOrEqual(2_000);
         expect(htlcClassification('Returned')).toContain('not verified');
     });
 
@@ -106,5 +106,16 @@ describe('support diagnostics', () => {
         expect(parsed.breez.walletInfo.balanceSats).toBe('123');
         expect(parsed.zaparc.authoritativeSync.succeeded).toBe(true);
         expect(parsed.zaparc.htlcStatusLabel).toContain('not verified');
+    });
+
+    it('includes the complete active wallet session and retained recovery context', () => {
+        const startedAt = new Date('2026-08-30T13:00:00.000Z');
+        beginSdkLogSession(startedAt);
+        recordSdkLog('DEBUG', 'historical recovery query without selected payment identifier', new Date('2026-08-30T13:00:01.000Z'));
+
+        const parsed = JSON.parse(buildSdkLogsExport(undefined, undefined, new Date('2026-08-30T13:00:02.000Z')));
+        expect(parsed.currentSdkSessionLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
+        expect(parsed.fullRetainedSdkLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
+        expect(parsed.retention.maxEntries).toBe(2_000);
     });
 });

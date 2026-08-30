@@ -19,7 +19,7 @@ import { hideBalanceLoading } from './ui-helpers';
 import { showSuccess, showInfo } from './notifications';
 import * as bip39 from 'bip39';
 import { classifyClaimError, getClaimKey } from './onchain-claim-lifecycle';
-import { recordSdkLog } from './support-diagnostics';
+import { beginSdkLogSession, recordSdkLog } from './support-diagnostics';
 
 // BIP39 wordlist for sub-wallet derivation
 const BIP39_WORDLIST = bip39.wordlists.english;
@@ -483,6 +483,10 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
     });
 
     try {
+        // Delimit the active wallet connection so a support export can include
+        // the complete import/recovery sync, even when individual lines do not
+        // contain the selected payment id.
+        beginSdkLogSession();
         // CRITICAL: Initialize WASM module FIRST (required for web/browser environments)
         console.log('🔍 [Popup-SDK] Initializing Breez WASM module...');
         await init();
