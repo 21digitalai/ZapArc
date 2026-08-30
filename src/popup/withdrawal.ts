@@ -537,7 +537,7 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
 
     try {
         const prepared = await breezSDK.prepareSendPayment({
-            paymentRequest: address,
+            paymentRequest: { type: 'input', input: address },
             amount: BigInt(amount)
         });
 
@@ -601,7 +601,7 @@ async function previewOnchainPayment(): Promise<void> {
 
         // Single prepare call — SDK returns fee quotes for all 3 speeds
         const prepared = await breezSDK.prepareSendPayment({
-            paymentRequest: address,
+            paymentRequest: { type: 'input', input: address },
             amount: BigInt(amount)
         });
 
@@ -716,7 +716,7 @@ export async function previewPayment(): Promise<void> {
 
         if (isInvoice) {
             const prepared = await breezSDK.prepareSendPayment({
-                paymentRequest: input,
+                paymentRequest: { type: 'input', input },
                 amount: amount > 0 ? BigInt(amount) : undefined
             });
 
@@ -780,7 +780,7 @@ export async function previewPayment(): Promise<void> {
             if (comment && comment.length > allowed) throw new Error(`Comment is too long. This recipient accepts up to ${allowed} characters.`);
 
             const prepareResponse = await breezSDK.prepareLnurlPay({
-                amountSats: amount,
+                amount: BigInt(amount),
                 payRequest,
                 comment,
                 validateSuccessActionUrl: true
