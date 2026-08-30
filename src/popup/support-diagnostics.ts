@@ -29,6 +29,13 @@ export interface PaymentLogCorrelation {
     details?: unknown;
 }
 
+export interface SdkSupportSnapshots {
+    payment?: Payment;
+    walletInfo?: unknown;
+    syncSucceeded: boolean;
+    syncError?: string;
+}
+
 function removeTrueSecrets(value: string): string {
     return TRUE_SECRET_PATTERNS.reduce((result, pattern) => result.replace(pattern, match => {
         const separator = match.includes('=') ? '=' : ':';
@@ -164,7 +171,11 @@ function collectPaymentCorrelationValues(payment?: PaymentLogCorrelation): strin
  * identifiers, invoices, addresses, pubkeys and paths are preserved. Only
  * credential patterns removed at ingestion time remain unavailable.
  */
-export function buildSdkLogsExport(payment: PaymentLogCorrelation | undefined, now = new Date()): string {
+export function buildSdkLogsExport(
+    payment: PaymentLogCorrelation | undefined,
+    snapshots?: SdkSupportSnapshots,
+    now = new Date(),
+): string {
     const generatedAt = now.toISOString();
     const nowMs = now.getTime();
     const windowMs = 15 * 60 * 1000;
@@ -178,7 +189,10 @@ export function buildSdkLogsExport(payment: PaymentLogCorrelation | undefined, n
     const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => sanitizeSupportValue(entry, false));
     const manifest = globalThis.chrome?.runtime?.getManifest?.();
 
-    return JSON.stringify({
+    const nativePayment = snapshots?.payment;
+    const htlc = getHtlcDetails(nativePayment);
+
+    return JSON.stringify(sanitizeSupportValue({
         schemaVersion: 1,
         exportType: 'sdk-support-logs',
         generatedAt,
@@ -200,9 +214,24 @@ export function buildSdkLogsExport(payment: PaymentLogCorrelation | undefined, n
         },
         retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: false },
         warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
+        breez: {
+            paymentSnapshot: nativePayment || null,
+            walletInfo: snapshots?.walletInfo || null,
+        },
+        zaparc: {
+            authoritativeSync: {
+                attempted: snapshots !== undefined,
+                succeeded: snapshots?.syncSucceeded ?? false,
+                error: snapshots?.syncError || null,
+            },
+            htlcStatusLabel: htlcClassification(htlc?.status),
+            note: nativePayment
+                ? 'Breez-native payment and wallet snapshots were captured after a fresh sync. ZapArc interpretation is kept separate.'
+                : 'No live Breez payment snapshot was available; retained SDK logs and cached correlation are included.',
+        },
         exactPaymentLogs: prepareLogs(exactPaymentLogs),
         paymentTimeWindowAvailable: paymentTimeWindow.length > 0,
         paymentTimeWindowLogs: prepareLogs(paymentTimeWindow),
         recentWindowLogs: prepareLogs(recentWindow),
-    }, (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
+    }, false), (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
 }

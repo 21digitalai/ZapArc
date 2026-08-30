@@ -43,7 +43,7 @@ describe('support diagnostics', () => {
             details: { type: 'lightning' },
         } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
 
-        const output = buildSdkLogsExport(payment, now);
+        const output = buildSdkLogsExport(payment, undefined, now);
         expect(output).toContain('"exportType": "sdk-support-logs"');
         expect(output).toContain('secret-payment');
         expect(output).toContain('"sanitized": false');
@@ -61,7 +61,7 @@ describe('support diagnostics', () => {
             timestamp: Math.floor(paymentAt.getTime() / 1000), method: 'lightning', details: { type: 'lightning' },
         } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
 
-        const parsed = JSON.parse(buildSdkLogsExport(payment, new Date('2026-08-30T12:39:52.000Z')));
+        const parsed = JSON.parse(buildSdkLogsExport(payment, undefined, new Date('2026-08-30T12:39:52.000Z')));
         expect(parsed.correlation.exactPaymentLogMatchAvailable).toBe(false);
         expect(parsed.exactPaymentLogs).toEqual([]);
         expect(parsed.paymentTimeWindowAvailable).toBe(true);
@@ -80,11 +80,31 @@ describe('support diagnostics', () => {
             status: 'completed',
             paymentType: 'receive',
             amount: 16,
-        }, now));
+        }, undefined, now));
 
         expect(parsed.correlation.paymentId).toBe('01a052a2-2cd9-72f3-bb09-3fdf173a278a');
         expect(parsed.correlation.paymentTimestamp).toBe(paymentAt.toISOString());
         expect(parsed.correlation.exactPaymentLogMatchAvailable).toBe(true);
         expect(parsed.exactPaymentLogs).toHaveLength(1);
+    });
+
+    it('includes Breez-native payment and wallet snapshots after an authoritative sync', () => {
+        const payment = {
+            id: 'failed-payment', status: 'failed', paymentType: 'send', amount: 45n, fees: 1n,
+            timestamp: 1, method: 'lightning',
+            details: { type: 'lightning', htlcDetails: { paymentHash: 'hash', expiryTime: 99, status: 'returned' } },
+        } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+
+        const parsed = JSON.parse(buildSdkLogsExport(payment, {
+            payment,
+            walletInfo: { balanceSats: 123n },
+            syncSucceeded: true,
+        }));
+
+        expect(parsed.breez.paymentSnapshot.id).toBe('failed-payment');
+        expect(parsed.breez.paymentSnapshot.amount).toBe('45');
+        expect(parsed.breez.walletInfo.balanceSats).toBe('123');
+        expect(parsed.zaparc.authoritativeSync.succeeded).toBe(true);
+        expect(parsed.zaparc.htlcStatusLabel).toContain('not verified');
     });
 });

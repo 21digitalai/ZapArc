@@ -1054,12 +1054,45 @@ function showTransactionDetail(tx: StoredTransaction): void {
         method: tx.method,
     };
     const sdkLogsButton = document.getElementById('tx-copy-sdk-logs') as HTMLButtonElement | null;
-    if (sdkLogsButton) sdkLogsButton.addEventListener('click', () => {
-        copyExportText(
-            buildSdkLogsExport(payment),
-            'SDK logs copied.',
-            'sdk-logs',
-        ).catch(error => showError(String(error)));
+    if (sdkLogsButton) sdkLogsButton.addEventListener('click', async () => {
+        sdkLogsButton.disabled = true;
+        sdkLogsButton.textContent = 'Collecting SDK logs…';
+        let livePayment: import('@breeztech/breez-sdk-spark/web').Payment | undefined;
+        let walletInfo: unknown;
+        let syncSucceeded = false;
+        let syncError: string | undefined;
+
+        try {
+            if (!breezSDK) throw new Error('Wallet not connected');
+            await breezSDK.syncWallet({});
+            syncSucceeded = true;
+            const [paymentResponse, infoResponse] = await Promise.all([
+                breezSDK.getPayment({ paymentId: tx.id }),
+                breezSDK.getInfo({ ensureSynced: false }),
+            ]);
+            livePayment = paymentResponse.payment;
+            walletInfo = infoResponse;
+        } catch (error) {
+            syncError = error instanceof Error ? error.message : String(error);
+        }
+
+        try {
+            await copyExportText(
+                buildSdkLogsExport(livePayment || payment, {
+                    payment: livePayment,
+                    walletInfo,
+                    syncSucceeded,
+                    syncError,
+                }),
+                'SDK logs copied.',
+                'sdk-logs',
+            );
+        } catch (error) {
+            showError(String(error));
+        } finally {
+            sdkLogsButton.disabled = false;
+            sdkLogsButton.textContent = 'Copy SDK logs';
+        }
     });
 
     // Show modal
