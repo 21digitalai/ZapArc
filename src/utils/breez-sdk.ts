@@ -173,7 +173,9 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      const prepared = await this.sdk.prepareSendPayment({ paymentRequest: request.bolt11 });
+      const prepared = await this.sdk.prepareSendPayment({
+        paymentRequest: { type: 'input', input: request.bolt11 }
+      });
       await this.sdk.sendPayment({ prepareResponse: prepared });
       return true;
     } catch (error) {
@@ -194,7 +196,7 @@ export class BreezSDKWrapper {
         id: payment.id,
         type: payment.paymentType === 'send' ? 'send' : 'receive',
         amount: Number(payment.amount || 0),
-        description: payment.description || '',
+        description: payment.details?.description || '',
         timestamp: payment.timestamp || 0,
         status: this.mapPaymentStatus(payment.status)
       }));
@@ -233,7 +235,7 @@ export class BreezSDKWrapper {
       });
 
       const prepareResponse = await this.sdk.prepareLnurlPay({
-        amountSats: request.amountSats,
+        amount: BigInt(request.amountSats),
         payRequest: request.reqData,
         comment: request.comment || undefined,
         validateSuccessActionUrl: true
@@ -259,13 +261,16 @@ export class BreezSDKWrapper {
       });
 
       // Build success result with payment details
+      const htlcDetails = result.payment?.details && 'htlcDetails' in result.payment.details
+        ? result.payment.details.htlcDetails
+        : undefined;
       const payResult: LnurlPayResult = {
         success: true,
         paymentId: result.payment?.id,
-        paymentHash: result.payment?.details?.paymentHash,
-        preimage: result.payment?.details?.preimage,
-        amountSats: result.payment?.amountSats || request.amountSats,
-        feeSats: result.payment?.fees || prepareResponse.feeSats
+        paymentHash: htlcDetails?.paymentHash,
+        preimage: htlcDetails?.preimage,
+        amountSats: result.payment ? Number(result.payment.amount) : request.amountSats,
+        feeSats: result.payment ? Number(result.payment.fees) : prepareResponse.feeSats
       };
 
       // Include success action if present
@@ -549,6 +554,7 @@ export class BreezSDKWrapper {
   private mapPaymentStatus(breezStatus: string): 'pending' | 'completed' | 'failed' {
     switch (breezStatus?.toLowerCase()) {
       case 'complete':
+      case 'completed':
       case 'succeeded':
         return 'completed';
       case 'pending':

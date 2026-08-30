@@ -649,19 +649,22 @@ async function loadTransactionHistory() {
             }
 
             const senderComment = await loadPaymentComment(commentWalletId, commentSubWalletIndex, payment.id);
+            const nativeDetails = payment.details || {};
+            const htlcDetails = nativeDetails.htlcDetails || {};
+            const invoiceDetails = nativeDetails.invoiceDetails || {};
             return {
                 id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
                 amount: Number(payment.amount ?? payment.amountSats ?? 0),
                 timestamp: (payment.timestamp || 0) * 1000,
                 status: normalizedStatus,
-                description: payment.description || undefined,
+                description: payment.description || nativeDetails.description || invoiceDetails.description || undefined,
                 method,
                 feeSats: Number(payment.fees ?? payment.feeSats ?? 0) || undefined,
                 onchainFeeSats: payment.details?.onchainFeeSats || payment.details?.feeSats || undefined,
-                paymentHash: payment.paymentHash || payment.details?.paymentHash || undefined,
-                preimage: payment.preimage || payment.details?.preimage || undefined,
-                bolt11: payment.bolt11 || payment.details?.bolt11 || undefined,
+                paymentHash: payment.paymentHash || htlcDetails.paymentHash || undefined,
+                preimage: payment.preimage || htlcDetails.preimage || undefined,
+                bolt11: payment.bolt11 || nativeDetails.invoice || invoiceDetails.invoice || undefined,
                 txid: payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
                 confirmations: typeof confirmations === 'number' ? confirmations : undefined,
                 vout: typeof (payment.details?.vout ?? payment.vout) === 'number' ? (payment.details?.vout ?? payment.vout) : undefined,

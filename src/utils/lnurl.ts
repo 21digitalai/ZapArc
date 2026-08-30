@@ -114,12 +114,18 @@ export class LnurlManager {
       // Parse LNURL first
       const reqData = await this.parseLnurl(lnurl);
 
-      if (reqData.type !== 'pay') {
+      const payData = reqData.type === 'pay'
+        ? reqData.data as LnurlPayData
+        : reqData.type === 'lnurlPay'
+          ? reqData as LnurlPayData
+          : reqData.type === 'lightningAddress'
+            ? reqData.payRequest as LnurlPayData
+            : null;
+      if (!payData) {
         throw new Error('LNURL is not a pay request');
       }
 
       // Validate amount is within bounds
-      const payData = reqData.data as LnurlPayData;
       const amountMsat = amount * 1000;
 
       if (amountMsat < payData.minSendable || amountMsat > payData.maxSendable) {
@@ -147,7 +153,7 @@ export class LnurlManager {
       }
 
       // Execute payment and wait for confirmation
-      const result = await this.walletManager.payLnurl(reqData.data, amount, hasComment ? comment : undefined);
+      const result = await this.walletManager.payLnurl(payData, amount, hasComment ? comment : undefined);
 
       return result;
     } catch (error) {
@@ -236,11 +242,10 @@ export class LnurlManager {
     try {
       const parsed = await this.parseLnurl(lnurl);
       
-      if (parsed.type !== 'pay') {
+      const payData = parsed.type === 'pay' ? parsed.data : parsed.type === 'lnurlPay' ? parsed : parsed.type === 'lightningAddress' ? parsed.payRequest : null;
+      if (!payData) {
         return null;
       }
-
-      const payData = parsed.data as LnurlPayData;
       return {
         min: Math.ceil(payData.minSendable / 1000), // Convert msat to sat
         max: Math.floor(payData.maxSendable / 1000)
@@ -258,11 +263,10 @@ export class LnurlManager {
     try {
       const parsed = await this.parseLnurl(lnurl);
       
-      if (parsed.type !== 'pay') {
+      const payData = parsed.type === 'pay' ? parsed.data : parsed.type === 'lnurlPay' ? parsed : parsed.type === 'lightningAddress' ? parsed.payRequest : null;
+      if (!payData) {
         return { allowed: false };
       }
-
-      const payData = parsed.data as LnurlPayData;
       return {
         allowed: !!payData.commentAllowed,
         maxLength: payData.commentAllowed

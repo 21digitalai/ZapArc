@@ -30,4 +30,16 @@ describe('LnurlManager comment delivery', () => {
 
         expect(wallet.payLnurl).toHaveBeenCalledWith(expect.anything(), 10, '  exact note  ');
     });
+
+    it('accepts the flattened LNURL-pay shape returned by Breez 0.23', async () => {
+        const wallet = {
+            parseLnurl: vi.fn().mockResolvedValue({ type: 'lnurlPay', minSendable: 1_000, maxSendable: 100_000, commentAllowed: 0 }),
+            hasSufficientBalance: vi.fn().mockResolvedValue(true),
+            payLnurl: vi.fn().mockResolvedValue({ success: true })
+        } as any;
+
+        await new LnurlManager(wallet).payLnurl('alice@example.com', 10);
+
+        expect(wallet.payLnurl).toHaveBeenCalledWith(expect.objectContaining({ type: 'lnurlPay' }), 10, undefined);
+    });
 });

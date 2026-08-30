@@ -51,7 +51,10 @@ async function ensureBreezLogging(): Promise<void> {
     if (breezLoggingInitialized) return;
     try {
         const logger = new JsLogger();
-        await initLogging(logger);
+        // Breez support requires SDK logs up to and including DEBUG for
+        // production troubleshooting. The bounded diagnostics ring prevents
+        // this from growing without limit.
+        await initLogging(logger, 'debug');
         breezLoggingInitialized = true;
         console.log('✅ [Popup-SDK] Breez SDK logging initialized');
     } catch (error) {
