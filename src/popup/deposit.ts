@@ -161,13 +161,23 @@ async function drawBrandedQR(canvas: HTMLCanvasElement, value: string, width: nu
     logo.src = chrome.runtime.getURL('icons/qr-brand-logo.png');
     await new Promise<void>((resolve) => {
         logo.onload = () => {
-            // Match ZapArc Mobile's branded QR treatment: the pre-composited
-            // navy badge includes its own safe background and is sized to 30%
-            // with H-level error correction.
-            const size = Math.round(canvas.width * 0.30);
-            const x = Math.round((canvas.width - size) / 2);
-            const y = Math.round((canvas.height - size) / 2);
-            context.drawImage(logo, x, y, size, size);
+            // Long BOLT11 invoices produce much denser QR matrices. A logo
+            // covering 30% of the canvas destroys too many contiguous modules
+            // even with H-level error correction, so keep the branded overlay
+            // deliberately small and give it a clean white isolation plate.
+            const isDensePayload = value.length > 180;
+            const logoRatio = isDensePayload ? 0.14 : 0.18;
+            const plateRatio = isDensePayload ? 0.18 : 0.22;
+            const plateSize = Math.round(canvas.width * plateRatio);
+            const plateX = Math.round((canvas.width - plateSize) / 2);
+            const plateY = Math.round((canvas.height - plateSize) / 2);
+            context.fillStyle = '#FFFFFF';
+            context.fillRect(plateX, plateY, plateSize, plateSize);
+
+            const logoSize = Math.round(canvas.width * logoRatio);
+            const logoX = Math.round((canvas.width - logoSize) / 2);
+            const logoY = Math.round((canvas.height - logoSize) / 2);
+            context.drawImage(logo, logoX, logoY, logoSize, logoSize);
             resolve();
         };
         logo.onerror = () => resolve();
