@@ -3732,6 +3732,15 @@ body.modal-open {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.history-transaction-item.failed {
+  border-color: rgba(244, 67, 54, 0.55);
+  background: rgba(244, 67, 54, 0.08);
+}
+
+.history-transaction-item.failed:hover {
+  background: rgba(244, 67, 54, 0.14);
+}
+
 .history-tx-icon {
   width: 36px;
   height: 36px;
@@ -3752,6 +3761,12 @@ body.modal-open {
   background-color: rgba(244, 67, 54, 0.2);
 }
 
+.history-transaction-item.failed .history-tx-icon {
+  color: #ff8a80;
+  background-color: rgba(244, 67, 54, 0.24);
+  font-weight: 700;
+}
+
 .history-tx-info {
   flex: 1;
   min-width: 0;
@@ -3762,6 +3777,29 @@ body.modal-open {
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 2px;
+}
+
+.history-tx-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.history-tx-status.tx-status-failed {
+  color: #ff8a80;
+  background: rgba(244, 67, 54, 0.18);
+}
+
+.history-tx-status.tx-status-pending {
+  color: #ffd180;
+  background: rgba(255, 152, 0, 0.16);
 }
 
 .history-tx-description {

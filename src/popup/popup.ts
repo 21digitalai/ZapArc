@@ -1153,14 +1153,19 @@ function showTransactionHistoryView(): void {
             const isReceive = tx.type === 'receive';
             const time = new Date(tx.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             const globalIdx = storedTransactions.indexOf(tx);
+            const txStatus = getTransactionStatus(tx);
+            const isFailed = txStatus.className === 'tx-status-failed';
 
             return `
-                <div class="history-transaction-item" data-tx-index="${globalIdx}">
+                <div class="history-transaction-item${isFailed ? ' failed' : ''}" data-tx-index="${globalIdx}">
                     <div class="history-tx-icon ${isReceive ? 'receive' : 'send'}">
-                        ${isReceive ? '⬇️' : '⬆️'}
+                        ${isFailed ? '✕' : (isReceive ? '⬇️' : '⬆️')}
                     </div>
                     <div class="history-tx-info">
-                        <div class="history-tx-type">${isReceive ? 'Received' : 'Sent'}</div>
+                        <div class="history-tx-type">
+                            ${isReceive ? 'Received' : 'Sent'}
+                            ${txStatus.label ? `<span class="history-tx-status ${txStatus.className}">${txStatus.label}</span>` : ''}
+                        </div>
                         ${tx.description ? `<div class="history-tx-description">${escapeHtml(tx.description)}</div>` : ''}
                         <div class="history-tx-time">${time}</div>
                     </div>
