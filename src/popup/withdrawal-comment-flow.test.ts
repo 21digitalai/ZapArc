@@ -82,4 +82,43 @@ describe('withdrawal comment flow', () => {
         expect(detailHtml).toContain('comment approved in preview');
         expect(detailHtml).not.toContain('later composer edit');
     });
+
+    it('passes Lightning Addresses directly to Breez 0.23 instead of converting them to endpoint URLs', async () => {
+        const elements: Record<string, TestElement> = {
+            'payment-input': element('shiro@breez.tips'),
+            'withdrawal-amount': element('15'),
+            'withdrawal-comment': element(''),
+            'preview-payment-btn': element(),
+            'send-payment-btn': element(),
+            'payment-preview': element()
+        };
+        vi.stubGlobal('document', {
+            getElementById: (id: string) => elements[id] || null,
+            querySelectorAll: () => []
+        });
+
+        const payRequest = {
+            callback: 'https://breez.tips/.well-known/lnurlp/shiro/callback',
+            minSendable: 1_000,
+            maxSendable: 100_000,
+            metadataStr: '[]',
+            commentAllowed: 0,
+            domain: 'breez.tips',
+            url: 'https://breez.tips/.well-known/lnurlp/shiro',
+            address: 'shiro@breez.tips'
+        };
+        state.sdk = {
+            parse: vi.fn(async () => ({ type: 'lightningAddress', address: 'shiro@breez.tips', payRequest })),
+            prepareLnurlPay: vi.fn(async () => ({ amountSats: 15, feeSats: 1, payRequest }))
+        };
+
+        const { previewPayment } = await import('./withdrawal');
+        await previewPayment();
+
+        expect(state.sdk.parse).toHaveBeenCalledWith('shiro@breez.tips');
+        expect(state.sdk.prepareLnurlPay).toHaveBeenCalledWith(expect.objectContaining({
+            amount: 15n,
+            payRequest
+        }));
+    });
 });

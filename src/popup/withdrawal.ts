@@ -744,13 +744,10 @@ export async function previewPayment(): Promise<void> {
                 enteredCurrency
             });
         } else {
-            let lnurlInput = input;
-            if (input.includes('@') && !input.toLowerCase().startsWith('lnurl')) {
-                const [username, domain] = input.split('@');
-                lnurlInput = `https://${domain}/.well-known/lnurlp/${username}`;
-            }
-
-            const parsed = await breezSDK.parse(lnurlInput);
+            // Breez 0.23 parses Lightning Addresses directly and resolves the
+            // LNURL-pay endpoint itself. Passing the legacy well-known URL is
+            // rejected by the SDK as `Invalid input`.
+            const parsed = await breezSDK.parse(input);
             if (parsed.type !== 'lnurlPay' && parsed.type !== 'lightningAddress') {
                 throw new Error(`Unsupported input type: ${parsed.type}`);
             }
