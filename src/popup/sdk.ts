@@ -488,6 +488,10 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
         await init();
         console.log('✅ [Popup-SDK] WASM initialized successfully');
 
+        // Register Breez's native streaming logger before connecting the
+        // wallet so connect/sync/payment logs are captured from the start.
+        await ensureBreezLogging();
+
         // Now create configuration (WASM must be initialized first)
         console.log('🔍 [Popup-SDK] Creating default config...');
         const config: Config = defaultConfig('mainnet');
