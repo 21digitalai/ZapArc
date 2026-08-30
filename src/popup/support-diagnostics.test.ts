@@ -21,4 +21,10 @@ describe('support diagnostics', () => {
         expect(buildSupportExport(payment, 10, false)).not.toContain('payment-id');
         expect(buildSupportExport(payment, 10, true)).toContain('payment-id');
     });
+
+    it('serializes bigint values anywhere in the Breez response', () => {
+        const payment = { id: 'payment-id', status: 'completed', paymentType: 'receive', amount: 2n, fees: 0n, timestamp: 1, method: 'spark', details: { type: 'spark', invoiceDetails: { invoice: 'spark123' } }, futureSdkField: { amount: 999n } } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+        expect(() => buildSupportExport(payment, 10, true)).not.toThrow();
+        expect(buildSupportExport(payment, 10, true)).toContain('"amount": "999"');
+    });
 });

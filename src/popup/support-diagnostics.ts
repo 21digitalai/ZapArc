@@ -106,5 +106,9 @@ export function buildSupportExport(payment: Payment | undefined, balanceSats: nu
         },
         sdkLogs: ring,
     };
-    return JSON.stringify(sanitizeSupportValue(snapshot, !detailed), null, 2);
+    return JSON.stringify(
+        sanitizeSupportValue(snapshot, !detailed),
+        (_key, value) => typeof value === 'bigint' ? value.toString() : value,
+        2,
+    );
 }

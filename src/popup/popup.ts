@@ -711,7 +711,10 @@ async function loadTransactionHistory() {
 
         if (activeWalletId) {
             const cacheKey = walletCacheKey('cachedTransactions', activeWalletId, activeSubWalletIndex);
-            await chrome.storage.local.set({ [cacheKey]: storedTransactions.slice(0, 10) });
+            // Breez 0.23.x payments contain bigint fields. Keep the native payment
+            // in memory for diagnostics, but never pass it to Chrome storage.
+            const cacheableTransactions = storedTransactions.slice(0, 10).map(({ rawPayment: _rawPayment, ...transaction }) => transaction);
+            await chrome.storage.local.set({ [cacheKey]: cacheableTransactions });
 
             if (activeSubWalletIndex > 0) {
                 const hasTransactions = payments.length > 0;
