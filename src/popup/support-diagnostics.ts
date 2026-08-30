@@ -124,6 +124,27 @@ function paymentTimestampMs(payment?: Payment): number | undefined {
     return value < 10_000_000_000 ? value * 1000 : value;
 }
 
+function collectPaymentCorrelationValues(payment?: Payment): string[] {
+    if (!payment) return [];
+    const values = new Set<string>();
+    const visit = (value: unknown, key = ''): void => {
+        if (typeof value === 'string') {
+            const normalizedKey = key.replace(/([a-z])([A-Z])/g, '$1_$2');
+            if (SUPPORT_IDENTIFIER_KEYS.test(normalizedKey) && value.length >= 8) values.add(value);
+            return;
+        }
+        if (Array.isArray(value)) {
+            value.forEach(item => visit(item, key));
+            return;
+        }
+        if (value && typeof value === 'object') {
+            Object.entries(value as Record<string, unknown>).forEach(([entryKey, entryValue]) => visit(entryValue, entryKey));
+        }
+    };
+    visit(payment);
+    return [...values];
+}
+
 /**
  * Export SDK logs as a support artifact, separately from payment diagnostics.
  * The sanitized variant removes correlation identifiers from log text. The
@@ -135,9 +156,11 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
     const nowMs = now.getTime();
     const windowMs = 15 * 60 * 1000;
     const paymentAt = paymentTimestampMs(payment);
-    const paymentWindow = paymentAt === undefined
+    const paymentTimeWindow = paymentAt === undefined
         ? []
         : ring.filter(entry => Math.abs(Date.parse(entry.at) - paymentAt) <= windowMs);
+    const correlationValues = collectPaymentCorrelationValues(payment);
+    const exactPaymentLogs = paymentTimeWindow.filter(entry => correlationValues.some(value => entry.line.includes(value)));
     const recentWindow = ring.filter(entry => Date.parse(entry.at) >= nowMs - windowMs);
     const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => (
         detailed ? sanitizeSupportValue(entry, false) : sanitizeSupportValue(entry, true)
@@ -158,6 +181,11 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
             paymentId: detailed ? payment?.id || null : payment?.id ? '[REDACTED]' : null,
             paymentTimestamp: paymentAt === undefined ? null : new Date(paymentAt).toISOString(),
             windowMinutes: 15,
+            mode: 'identifier-match-plus-time-window-context',
+            exactPaymentLogMatchAvailable: exactPaymentLogs.length > 0,
+            note: exactPaymentLogs.length > 0
+                ? 'Exact logs contain a payment identifier from the selected Breez payment. Time-window logs are broader wallet context.'
+                : 'No SDK log line containing an identifier from the selected payment was retained. Time-window logs are broader wallet context only.',
         },
         retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: !detailed },
         ...(detailed ? {
@@ -165,8 +193,9 @@ export function buildSdkLogsExport(payment: Payment | undefined, detailed: boole
         } : {
             redactions: ['payment identifiers', 'invoices', 'LNURLs', 'addresses and pubkeys'],
         }),
-        paymentWindowAvailable: paymentWindow.length > 0,
-        paymentWindowLogs: prepareLogs(paymentWindow),
+        exactPaymentLogs: prepareLogs(exactPaymentLogs),
+        paymentTimeWindowAvailable: paymentTimeWindow.length > 0,
+        paymentTimeWindowLogs: prepareLogs(paymentTimeWindow),
         recentWindowLogs: prepareLogs(recentWindow),
     }, (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
 }

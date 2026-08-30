@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSdkLogsExport, buildSupportExport, htlcClassification, recentSdkLogs, recordSdkLog, sanitizeSupportValue } from './support-diagnostics';
+import type { SdkSupportLog } from './support-diagnostics';
 
 describe('support diagnostics', () => {
     it('irreversibly removes true secrets from support exports', () => {
@@ -48,6 +49,25 @@ describe('support diagnostics', () => {
         expect(sanitized).not.toContain('secret-payment');
         expect(detailed).toContain('"exportType": "detailed-sdk-support-logs"');
         expect(detailed).toContain('secret-payment');
+        expect(detailed).toContain('"exactPaymentLogMatchAvailable": true');
+        expect(detailed).toContain('"exactPaymentLogs"');
+        expect(detailed).toContain('"paymentTimeWindowLogs"');
         expect(detailed.length).toBeGreaterThan(sanitized.length);
+    });
+
+    it('does not claim unrelated time-window logs are exact payment logs', () => {
+        const paymentAt = new Date('2026-08-30T12:25:56.000Z');
+        recordSdkLog('DEBUG', 'Building sdk and starting wallet sync', new Date('2026-08-30T12:39:00.000Z'));
+        const payment = {
+            id: '01a052a2-2cd9-72f3-bb09-3fdf173a278a',
+            status: 'completed', paymentType: 'send', amount: 2n, fees: 0n,
+            timestamp: Math.floor(paymentAt.getTime() / 1000), method: 'lightning', details: { type: 'lightning' },
+        } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+
+        const parsed = JSON.parse(buildSdkLogsExport(payment, true, new Date('2026-08-30T12:39:52.000Z')));
+        expect(parsed.correlation.exactPaymentLogMatchAvailable).toBe(false);
+        expect(parsed.exactPaymentLogs).toEqual([]);
+        expect(parsed.paymentTimeWindowAvailable).toBe(true);
+        expect(parsed.paymentTimeWindowLogs.some((entry: SdkSupportLog) => entry.line.includes('starting wallet sync'))).toBe(true);
     });
 });
