@@ -144,16 +144,15 @@ async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string
     if (!context) return;
 
     const logo = new Image();
-    logo.src = chrome.runtime.getURL('icons/bolt-transparent-latest.png');
+    logo.src = chrome.runtime.getURL('icons/qr-brand-logo.png');
     await new Promise<void>((resolve) => {
         logo.onload = () => {
-            const size = Math.round(canvas.width * 0.18);
+            // Match ZapArc Mobile's branded QR treatment: the pre-composited
+            // navy badge includes its own safe background and is sized to 30%
+            // with H-level error correction.
+            const size = Math.round(canvas.width * 0.30);
             const x = Math.round((canvas.width - size) / 2);
             const y = Math.round((canvas.height - size) / 2);
-            context.fillStyle = '#FFFFFF';
-            context.beginPath();
-            context.roundRect(x - 4, y - 4, size + 8, size + 8, 8);
-            context.fill();
             context.drawImage(logo, x, y, size, size);
             resolve();
         };
