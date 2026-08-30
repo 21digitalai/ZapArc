@@ -761,13 +761,13 @@ export async function displayInvoice(invoice: string, amount: number): Promise<v
     const qrCanvas = document.getElementById('deposit-qr-canvas') as HTMLCanvasElement;
     if (qrCanvas) {
         try {
-            // BOLT11 invoices are long and produce dense matrices. Keep these
-            // QR codes completely unobstructed; branded overlays remain only
-            // on the much shorter Lightning Address and on-chain payloads.
+            // Preserve the proven pre-branding invoice settings. H-level error
+            // correction makes long BOLT11 payloads substantially denser at
+            // this canvas size and some mobile scanners cannot resolve the
+            // resulting tiny modules. The qrcode default (M) scanned reliably.
             await QRCode.toCanvas(qrCanvas, invoice, {
                 width: 200,
                 margin: 2,
-                errorCorrectionLevel: 'H',
                 color: { dark: '#000000', light: '#FFFFFF' }
             });
         } catch (error) {
