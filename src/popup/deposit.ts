@@ -587,6 +587,7 @@ export function setupDepositListeners(): void {
     const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
     const currencySelect = document.getElementById('receive-currency-select') as HTMLSelectElement | null;
     const copyBtn = document.getElementById('copy-invoice-btn');
+    const saveInvoiceQrBtn = document.getElementById('save-invoice-qr-btn');
     const newInvoiceBtn = document.getElementById('new-invoice-btn');
     const addressCopyBtn = document.getElementById('receive-lightning-address-copy');
     const addressSaveBtn = document.getElementById('receive-lightning-address-save');
@@ -660,6 +661,19 @@ export function setupDepositListeners(): void {
             navigator.clipboard.writeText(invoiceText.value);
             showSuccess('Invoice copied to clipboard!');
         }
+    });
+
+    saveInvoiceQrBtn?.addEventListener('click', () => {
+        const canvas = document.getElementById('deposit-qr-canvas') as HTMLCanvasElement | null;
+        if (!canvas || canvas.width === 0 || canvas.height === 0) {
+            showError('Invoice QR is not ready yet');
+            return;
+        }
+        const link = document.createElement('a');
+        link.download = `zaparc-lightning-invoice-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showSuccess('Invoice QR image saved');
     });
 
     newInvoiceBtn?.addEventListener('click', () => showDepositStep('deposit-amount-step'));
