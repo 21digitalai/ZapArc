@@ -2564,23 +2564,35 @@ body.modal-open {
   height: 156px;
 }
 
-.receive-lightning-address-text {
+.receive-lightning-address-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   margin-top: 9px;
+}
+
+.receive-lightning-address-text {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  background: var(--input-bg);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
-  overflow-wrap: anywhere;
+  font-family: inherit;
 }
 
-.receive-lightning-address-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.receive-lightning-address-actions .btn-secondary {
+.receive-lightning-address-row .btn-secondary {
+  width: auto;
   margin: 0;
+}
+
+.receive-lightning-address-save {
+  width: 100%;
+  margin: 8px 0 0;
 }
 
 /* Professional Card Styling for Deposit/Withdraw */

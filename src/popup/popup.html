@@ -660,11 +660,11 @@
                         <div class="receive-lightning-address-qr-wrap">
                             <canvas id="receive-lightning-address-qr" aria-label="Lightning Address QR code"></canvas>
                         </div>
-                        <div id="receive-lightning-address-text" class="receive-lightning-address-text"></div>
-                        <div class="receive-lightning-address-actions">
+                        <div class="receive-lightning-address-row">
+                            <input id="receive-lightning-address-text" class="receive-lightning-address-text" type="text" readonly aria-label="Lightning Address" />
                             <button id="receive-lightning-address-copy" class="btn-secondary" type="button">Copy</button>
-                            <button id="receive-lightning-address-save" class="btn-secondary" type="button">Save</button>
                         </div>
+                        <button id="receive-lightning-address-save" class="btn-secondary receive-lightning-address-save" type="button">Save QR</button>
                     </div>
 
                     <div class="deposit-step" id="deposit-amount-step">

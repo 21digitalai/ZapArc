@@ -163,17 +163,17 @@ async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string
 
 async function renderReceiveLightningAddress(): Promise<void> {
     const card = document.getElementById('receive-lightning-address-card');
-    const text = document.getElementById('receive-lightning-address-text');
+    const text = document.getElementById('receive-lightning-address-text') as HTMLInputElement | null;
     const canvas = document.getElementById('receive-lightning-address-qr') as HTMLCanvasElement | null;
     const address = callbacks?.getLightningAddress?.()?.trim() || '';
 
     if (!card || !text || !canvas || !address) {
         card?.classList.add('hidden');
-        if (text) text.textContent = '';
+        if (text) text.value = '';
         return;
     }
 
-    text.textContent = address;
+    text.value = address;
     try {
         await drawLightningAddressQR(canvas, address);
         card.classList.remove('hidden');
