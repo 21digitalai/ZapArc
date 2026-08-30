@@ -1042,11 +1042,6 @@ function showTransactionDetail(tx: StoredTransaction): void {
     const payment = tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined;
     const sdkLogsButton = document.getElementById('tx-copy-sdk-logs') as HTMLButtonElement | null;
     if (sdkLogsButton) sdkLogsButton.addEventListener('click', () => {
-        if (sdkLogsButton.dataset.confirmed !== 'true') {
-            sdkLogsButton.dataset.confirmed = 'true';
-            sdkLogsButton.textContent = 'Copy full SDK logs — share only with trusted support';
-            return;
-        }
         copyExportText(
             buildSdkLogsExport(payment),
             'SDK logs copied.',
