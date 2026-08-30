@@ -132,9 +132,9 @@ export function setDepositCallbacks(cb: DepositCallbacks): void {
     callbacks = cb;
 }
 
-async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string): Promise<void> {
-    await QRCode.toCanvas(canvas, address, {
-        width: 168,
+async function drawBrandedQR(canvas: HTMLCanvasElement, value: string, width: number): Promise<void> {
+    await QRCode.toCanvas(canvas, value, {
+        width,
         margin: 2,
         errorCorrectionLevel: 'H',
         color: { dark: '#000000', light: '#FFFFFF' }
@@ -158,6 +158,10 @@ async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string
         };
         logo.onerror = () => resolve();
     });
+}
+
+async function drawLightningAddressQR(canvas: HTMLCanvasElement, address: string): Promise<void> {
+    await drawBrandedQR(canvas, address, 168);
 }
 
 async function renderReceiveLightningAddress(): Promise<void> {
@@ -527,11 +531,7 @@ async function generateOnchainAddress(): Promise<void> {
         // Render QR for easier scanning from another wallet/device
         if (onchainQrCanvas) {
             try {
-                await QRCode.toCanvas(onchainQrCanvas, `bitcoin:${address}`, {
-                    width: 200,
-                    margin: 2,
-                    color: { dark: '#000000', light: '#FFFFFF' }
-                });
+                await drawBrandedQR(onchainQrCanvas, `bitcoin:${address}`, 200);
                 onchainQrContainer?.classList.remove('hidden');
             } catch (qrError) {
                 console.warn('Failed to generate on-chain QR code:', qrError);
@@ -722,11 +722,7 @@ export async function displayInvoice(invoice: string, amount: number): Promise<v
     const qrCanvas = document.getElementById('deposit-qr-canvas') as HTMLCanvasElement;
     if (qrCanvas) {
         try {
-            await QRCode.toCanvas(qrCanvas, invoice, {
-                width: 200,
-                margin: 2,
-                color: { dark: '#000000', light: '#FFFFFF' }
-            });
+            await drawBrandedQR(qrCanvas, invoice, 200);
         } catch (error) {
             console.error('QR code generation error:', error);
             qrCanvas.style.display = 'none';
