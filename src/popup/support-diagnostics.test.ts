@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSupportExport, htlcClassification, recentSdkLogs, recordSdkLog, sanitizeSupportValue } from './support-diagnostics';
+import { buildSdkLogsExport, buildSupportExport, htlcClassification, recentSdkLogs, recordSdkLog, sanitizeSupportValue } from './support-diagnostics';
 
 describe('support diagnostics', () => {
     it('irreversibly removes true secrets from support exports', () => {
@@ -26,5 +26,28 @@ describe('support diagnostics', () => {
         const payment = { id: 'payment-id', status: 'completed', paymentType: 'receive', amount: 2n, fees: 0n, timestamp: 1, method: 'spark', details: { type: 'spark', invoiceDetails: { invoice: 'spark123' } }, futureSdkField: { amount: 999n } } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
         expect(() => buildSupportExport(payment, 10, true)).not.toThrow();
         expect(buildSupportExport(payment, 10, true)).toContain('"amount": "999"');
+    });
+
+    it('creates meaningfully distinct sanitized and detailed SDK log exports', () => {
+        const now = new Date('2026-08-30T12:00:00.000Z');
+        recordSdkLog('ERROR', 'payment id=secret-payment invoice=lnbc123 failed', now);
+        const payment = {
+            id: 'secret-payment',
+            status: 'failed',
+            paymentType: 'send',
+            amount: 2n,
+            fees: 0n,
+            timestamp: Math.floor(now.getTime() / 1000),
+            method: 'lightning',
+            details: { type: 'lightning' },
+        } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+
+        const sanitized = buildSdkLogsExport(payment, false, now);
+        const detailed = buildSdkLogsExport(payment, true, now);
+        expect(sanitized).toContain('"exportType": "sanitized-sdk-support-logs"');
+        expect(sanitized).not.toContain('secret-payment');
+        expect(detailed).toContain('"exportType": "detailed-sdk-support-logs"');
+        expect(detailed).toContain('secret-payment');
+        expect(detailed.length).toBeGreaterThan(sanitized.length);
     });
 });

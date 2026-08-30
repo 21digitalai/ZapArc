@@ -60,6 +60,10 @@ export function sanitizeSupportValue(value: unknown, redactIdentifiers = false, 
         const protectedValue = removeTrueSecrets(value);
         if (!redactIdentifiers) return protectedValue;
         return protectedValue
+            .replace(/\b(?:payment[_ -]?id|payment[_ -]?hash|invoice|destination[_ -]?pubkey|address|lnurl|id)\s*[:=]\s*[^\s,;"']+/gi, match => {
+                const separator = match.includes('=') ? '=' : ':';
+                return `${match.split(separator)[0]}${separator}[REDACTED]`;
+            })
             .replace(/\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b/gi, '[REDACTED:invoice]')
             .replace(/\b(?:lnurl)[0-9a-z]+\b/gi, '[REDACTED:lnurl]')
             .replace(/\b[0-9a-f]{64,66}\b/gi, '[REDACTED:identifier]')
@@ -111,4 +115,58 @@ export function buildSupportExport(payment: Payment | undefined, balanceSats: nu
         (_key, value) => typeof value === 'bigint' ? value.toString() : value,
         2,
     );
+}
+
+function paymentTimestampMs(payment?: Payment): number | undefined {
+    if (!payment) return undefined;
+    const value = Number(payment.timestamp);
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    return value < 10_000_000_000 ? value * 1000 : value;
+}
+
+/**
+ * Export SDK logs as a support artifact, separately from payment diagnostics.
+ * The sanitized variant removes correlation identifiers from log text. The
+ * detailed, explicitly-approved variant preserves Breez context while true
+ * secrets remain removed at ingestion time.
+ */
+export function buildSdkLogsExport(payment: Payment | undefined, detailed: boolean, now = new Date()): string {
+    const generatedAt = now.toISOString();
+    const nowMs = now.getTime();
+    const windowMs = 15 * 60 * 1000;
+    const paymentAt = paymentTimestampMs(payment);
+    const paymentWindow = paymentAt === undefined
+        ? []
+        : ring.filter(entry => Math.abs(Date.parse(entry.at) - paymentAt) <= windowMs);
+    const recentWindow = ring.filter(entry => Date.parse(entry.at) >= nowMs - windowMs);
+    const prepareLogs = (logs: SdkSupportLog[]): unknown[] => logs.map(entry => (
+        detailed ? sanitizeSupportValue(entry, false) : sanitizeSupportValue(entry, true)
+    ));
+    const manifest = globalThis.chrome?.runtime?.getManifest?.();
+
+    return JSON.stringify({
+        schemaVersion: 1,
+        exportType: detailed ? 'detailed-sdk-support-logs' : 'sanitized-sdk-support-logs',
+        generatedAt,
+        app: {
+            name: 'ZapArc Web',
+            version: manifest?.version || 'unknown',
+            sdkVersion: '@breeztech/breez-sdk-spark@0.23.1',
+            platform: 'chrome-extension',
+        },
+        correlation: {
+            paymentId: detailed ? payment?.id || null : payment?.id ? '[REDACTED]' : null,
+            paymentTimestamp: paymentAt === undefined ? null : new Date(paymentAt).toISOString(),
+            windowMinutes: 15,
+        },
+        retention: { maxEntries: MAX_LOGS, persisted: true, sanitized: !detailed },
+        ...(detailed ? {
+            warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
+        } : {
+            redactions: ['payment identifiers', 'invoices', 'LNURLs', 'addresses and pubkeys'],
+        }),
+        paymentWindowAvailable: paymentWindow.length > 0,
+        paymentWindowLogs: prepareLogs(paymentWindow),
+        recentWindowLogs: prepareLogs(recentWindow),
+    }, (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
 }

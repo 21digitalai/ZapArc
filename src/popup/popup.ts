@@ -38,7 +38,7 @@ import {
 
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
-import { buildSupportExport } from './support-diagnostics';
+import { buildSdkLogsExport, buildSupportExport } from './support-diagnostics';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -971,6 +971,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
         <div class="tx-diagnostics-actions">
             <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. It does not upload support data.</p>
             <button class="tx-diagnostics-btn" id="tx-check-status">Check payment status</button>
+            <button class="tx-diagnostics-btn" id="tx-copy-diagnostics">Copy payment diagnostics</button>
             <button class="tx-diagnostics-btn" id="tx-copy-support">Copy SDK support logs (sanitized)</button>
             <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-detailed">Show detailed export warning</button>
         </div>
@@ -1025,31 +1026,38 @@ function showTransactionDetail(tx: StoredTransaction): void {
         }
     });
 
-    const copyExport = async (detailed: boolean): Promise<void> => {
-        const exportText = buildSupportExport(
-            tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined,
-            currentBalance,
-            detailed,
-        );
+    const copyExportText = async (exportText: string, successMessage: string, filenamePrefix: string): Promise<void> => {
         try {
-            await copyToClipboard(
-                exportText,
-                detailed ? 'Detailed support export copied.' : 'Sanitized support export copied.',
-            );
+            await copyToClipboard(exportText, successMessage);
         } catch (error) {
             // Chrome can reject large clipboard writes or lose the transient user
             // activation while preparing an export. Never report a false success:
             // preserve the evidence as a JSON download instead.
             downloadTextFile(
                 exportText,
-                `zaparc-${detailed ? 'detailed-' : ''}support-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+                `zaparc-${filenamePrefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
             );
             console.warn('[Popup] Clipboard export failed; downloaded JSON instead:', error);
             showSuccess('Clipboard was unavailable. Support logs downloaded as JSON instead.');
         }
     };
+    const payment = tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined;
+    const diagnosticsButton = document.getElementById('tx-copy-diagnostics');
+    if (diagnosticsButton) diagnosticsButton.addEventListener('click', () => {
+        copyExportText(
+            buildSupportExport(payment, currentBalance, false),
+            'Payment diagnostics copied.',
+            'payment-diagnostics',
+        ).catch(error => showError(String(error)));
+    });
     const sanitizedButton = document.getElementById('tx-copy-support');
-    if (sanitizedButton) sanitizedButton.addEventListener('click', () => { copyExport(false).catch(error => showError(String(error))); });
+    if (sanitizedButton) sanitizedButton.addEventListener('click', () => {
+        copyExportText(
+            buildSdkLogsExport(payment, false),
+            'Sanitized SDK support logs copied.',
+            'sdk-support-logs',
+        ).catch(error => showError(String(error)));
+    });
     const detailedButton = document.getElementById('tx-copy-detailed') as HTMLButtonElement | null;
     if (detailedButton) detailedButton.addEventListener('click', () => {
         if (detailedButton.dataset.confirmed !== 'true') {
@@ -1057,7 +1065,11 @@ function showTransactionDetail(tx: StoredTransaction): void {
             detailedButton.textContent = 'Copy detailed logs — may include invoices and identifiers';
             return;
         }
-        copyExport(true).catch(error => showError(String(error)));
+        copyExportText(
+            buildSdkLogsExport(payment, true),
+            'Detailed SDK support logs copied.',
+            'detailed-sdk-logs',
+        ).catch(error => showError(String(error)));
     });
 
     // Show modal
