@@ -11,7 +11,8 @@ import init, {
     type ConnectRequest,
     type SdkEvent,
     type LogEntry,
-    type ServiceStatus
+    type ServiceStatus,
+    type Payment
 } from '@breeztech/breez-sdk-spark/web';
 import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
 import { hideBalanceLoading } from './ui-helpers';
@@ -26,6 +27,7 @@ const BIP39_WORDLIST = bip39.wordlists.english;
 export type SdkEventCallback = {
     onSync?: () => void;
     onPaymentReceived?: () => void;
+    onPaymentUpdated?: (payment: Payment) => void;
     onDepositClaimed?: () => void;
 };
 
@@ -133,6 +135,43 @@ async function claimPendingDeposits(sdk: BreezSdk, reason: string): Promise<void
 
 export function setSdkEventCallbacks(callbacks: SdkEventCallback): void {
     eventCallbacks = callbacks;
+}
+
+const PAYMENT_REFRESH_TIMEOUT_MS = 20_000;
+
+/**
+ * Force a wallet sync and then fetch one authoritative payment record.
+ * Keeping this payment-scoped prevents callers from inferring a terminal state
+ * from a stale listPayments snapshot.
+ */
+export async function refreshPaymentStatus(
+    paymentId: string,
+    timeoutMs: number = PAYMENT_REFRESH_TIMEOUT_MS
+): Promise<Payment> {
+    const activeSdk = breezSDK;
+    if (!activeSdk) {
+        throw new Error('Wallet not connected');
+    }
+
+    const refresh = async (): Promise<Payment> => {
+        await activeSdk.syncWallet({});
+        const response = await activeSdk.getPayment({ paymentId });
+        return response.payment;
+    };
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(
+            () => reject(new Error('Payment status check timed out. Please try again.')),
+            timeoutMs
+        );
+    });
+
+    try {
+        return await Promise.race([refresh(), timeout]);
+    } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    }
 }
 
 /** Public helper so popup can proactively check/claim on-chain deposits */
@@ -508,9 +547,11 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                         void claimSingleDeposit(sdk, deposit.txid, deposit.vout);
                     }
                 } else if (event.type === 'paymentFailed') {
-                    console.warn('❌ [Breez-SDK] Payment failed:', (event as any).payment?.id);
+                    console.warn('❌ [Breez-SDK] Payment failed:', event.payment.id);
+                    eventCallbacks.onPaymentUpdated?.(event.payment);
                 } else if (event.type === 'paymentPending') {
-                    console.log('⏳ [Breez-SDK] Payment pending:', (event as any).payment?.id);
+                    console.log('⏳ [Breez-SDK] Payment pending:', event.payment.id);
+                    eventCallbacks.onPaymentUpdated?.(event.payment);
                 }
             }
         });

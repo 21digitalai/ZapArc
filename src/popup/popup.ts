@@ -3499,6 +3499,10 @@ function setupModuleCallbacks(): void {
             // Also notify deposit interface for immediate UI update
             await handlePaymentReceivedFromSDK();
         },
+        onPaymentUpdated: async () => {
+            await updateBalanceDisplay();
+            await loadTransactionHistory();
+        },
         onDepositClaimed: async () => {
             await updateBalanceDisplay();
             await loadTransactionHistory();
