@@ -1026,8 +1026,27 @@ function showTransactionDetail(tx: StoredTransaction): void {
     });
 
     const copyExport = async (detailed: boolean): Promise<void> => {
-        await copyToClipboard(buildSupportExport(tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined, currentBalance, detailed));
-        showSuccess(detailed ? 'Detailed support export copied.' : 'Sanitized support export copied.');
+        const exportText = buildSupportExport(
+            tx.rawPayment as import('@breeztech/breez-sdk-spark/web').Payment | undefined,
+            currentBalance,
+            detailed,
+        );
+        try {
+            await copyToClipboard(
+                exportText,
+                detailed ? 'Detailed support export copied.' : 'Sanitized support export copied.',
+            );
+        } catch (error) {
+            // Chrome can reject large clipboard writes or lose the transient user
+            // activation while preparing an export. Never report a false success:
+            // preserve the evidence as a JSON download instead.
+            downloadTextFile(
+                exportText,
+                `zaparc-${detailed ? 'detailed-' : ''}support-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+            );
+            console.warn('[Popup] Clipboard export failed; downloaded JSON instead:', error);
+            showSuccess('Clipboard was unavailable. Support logs downloaded as JSON instead.');
+        }
     };
     const sanitizedButton = document.getElementById('tx-copy-support');
     if (sanitizedButton) sanitizedButton.addEventListener('click', () => { copyExport(false).catch(error => showError(String(error))); });
@@ -1147,14 +1166,59 @@ function hideTransactionHistoryView(): void {
     if (mainInterface) mainInterface.classList.remove('hidden');
 }
 
-async function copyToClipboard(text: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
-        showSuccess('Copied to clipboard!');
-    } catch (err) {
-        console.error('[Popup] Failed to copy:', err);
-        showError('Failed to copy');
+async function copyToClipboard(text: string, successMessage = 'Copied to clipboard!'): Promise<void> {
+    let clipboardError: unknown;
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showSuccess(successMessage);
+            return;
+        } catch (error) {
+            clipboardError = error;
+        }
     }
+
+    // MV3 extension popups can lose Clipboard API permission/user activation
+    // during async work. execCommand is a synchronous fallback while the popup
+    // document is still open and also handles large text values reliably.
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    textArea.style.top = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } finally {
+        textArea.remove();
+    }
+
+    if (!copied) {
+        const error = clipboardError instanceof Error
+            ? clipboardError
+            : new Error('Browser rejected the clipboard write');
+        console.error('[Popup] Failed to copy:', error);
+        throw error;
+    }
+
+    showSuccess(successMessage);
+}
+
+function downloadTextFile(text: string, filename: string): void {
+    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function escapeHtml(text: string): string {
