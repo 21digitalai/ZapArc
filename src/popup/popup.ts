@@ -2932,23 +2932,20 @@ async function handleWalletReset(modal: HTMLElement) {
 
                 // Clear session PIN to force re-unlock
                 await chrome.storage.session.remove(['walletSessionPin']);
+                // A previous unlock selection can still point at the wallet
+                // that was just removed. Let the selector derive a valid
+                // choice from the remaining wallet data instead.
+                await chrome.storage.local.remove(['selectedWalletForUnlock']);
                 
                 // Reset state
                 setIsWalletUnlocked(false);
                 setCurrentBalance(0);
                 setBreezSDK(null);
+                setActiveMasterKeyId(null);
+                setActiveSubWalletIndex(0);
+                clearWalletDisplay();
 
                 showNotification('Wallet deleted successfully', 'success', 3000);
-
-                // Hide all other interfaces first
-                const mainInterface = document.getElementById('main-interface');
-                if (mainInterface) mainInterface.classList.add('hidden');
-                
-                const unlockInterface = document.getElementById('unlock-interface');
-                if (unlockInterface) unlockInterface.classList.add('hidden');
-                
-                const wizard = document.getElementById('onboarding-wizard');
-                if (wizard) wizard.classList.add('hidden');
 
                 console.log('[Wallet] Showing wallet selection interface...');
                 

@@ -3,6 +3,7 @@
 
 import { ExtensionMessaging } from '../utils/messaging';
 import { setIsAddingWallet } from './state';
+import { hideAllViews } from './view-manager';
 
 /**
  * Show wallet selection interface
@@ -11,11 +12,13 @@ import { setIsAddingWallet } from './state';
 export async function showWalletSelectionInterface(): Promise<void> {
     console.log('🔵 [Wallet Selection] Showing wallet selection interface');
 
-    // Hide unlock interface
-    const unlockInterface = document.getElementById('unlock-interface');
-    if (unlockInterface) {
-        unlockInterface.classList.add('hidden');
-    }
+    // The selector is a top-level view. Always close every wallet-specific
+    // surface first so a deleted/locked wallet cannot remain visible behind it.
+    hideAllViews();
+
+    // Close the in-wallet dropdown too. It lives inside main-interface and can
+    // otherwise retain stale open state when main is shown again later.
+    document.getElementById('wallet-dropdown')?.classList.add('hidden');
 
     // Show wallet selection interface
     const selectionInterface = document.getElementById('wallet-selection-interface');
@@ -42,10 +45,7 @@ export async function showWalletSelectionInterface(): Promise<void> {
 export async function hideWalletSelectionInterface(): Promise<void> {
     console.log('🔵 [Wallet Selection] Hiding wallet selection interface');
 
-    const selectionInterface = document.getElementById('wallet-selection-interface');
-    if (selectionInterface) {
-        selectionInterface.classList.add('hidden');
-    }
+    hideAllViews();
 
     // Check if any wallets exist
     const walletsResponse = await ExtensionMessaging.getAllWallets();
@@ -60,8 +60,6 @@ export async function hideWalletSelectionInterface(): Promise<void> {
     } else {
         // No wallets - show setup wizard with welcome step (first time setup)
         const wizard = document.getElementById('onboarding-wizard');
-        const unlockInterface = document.getElementById('unlock-interface');
-        if (unlockInterface) unlockInterface.classList.add('hidden');
         if (wizard) {
             wizard.classList.remove('hidden');
             // Show welcome step for first-time users
