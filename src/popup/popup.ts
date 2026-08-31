@@ -2930,6 +2930,15 @@ async function handleWalletReset(modal: HTMLElement) {
 
                 modal.remove();
 
+                // Remove the deleted wallet from in-memory and rendered selector
+                // state before any other screen can become visible. Otherwise the
+                // next unlock briefly reveals the previous dropdown HTML while the
+                // authoritative wallet list is still loading.
+                hideAllViews();
+                setCurrentWallets(allWallets.filter(wallet => wallet.id !== activeWalletId));
+                const walletList = document.getElementById('wallet-list');
+                if (walletList) walletList.innerHTML = '';
+
                 // Clear session PIN to force re-unlock
                 await chrome.storage.session.remove(['walletSessionPin']);
                 // A previous unlock selection can still point at the wallet
@@ -2944,6 +2953,11 @@ async function handleWalletReset(modal: HTMLElement) {
                 setActiveMasterKeyId(null);
                 setActiveSubWalletIndex(0);
                 clearWalletDisplay();
+
+                // Rebuild the hidden main-wallet selector from post-delete
+                // storage now, so it is already correct when the next wallet is
+                // unlocked and main-interface is shown.
+                await initializeMultiWalletUI();
 
                 showNotification('Wallet deleted successfully', 'success', 3000);
 
