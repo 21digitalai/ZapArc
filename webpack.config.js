@@ -57,6 +57,12 @@ module.exports = (env, argv) => {
         chunks: ['settings']
       }),
 
+      new HtmlWebpackPlugin({
+        template: './src/legal/terms.html',
+        filename: 'terms.html',
+        chunks: []
+      }),
+
       new CopyWebpackPlugin({
         patterns: [
           {
@@ -67,6 +73,10 @@ module.exports = (env, argv) => {
             from: 'assets/icons',
             to: 'icons',
             noErrorOnMissing: true
+          },
+          {
+            from: 'src/legal/terms.css',
+            to: 'terms.css'
           }
         ]
       })
