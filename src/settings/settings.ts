@@ -4,6 +4,7 @@ import './settings.css';
 import { UserSettings } from '../types';
 import { ExtensionMessaging } from '../utils/messaging';
 import { DEFAULT_INVOICE_EXPIRY_SECS, customMinutesToExpirySecs, isInvoiceExpiryPreset } from '../utils/invoice-expiry';
+import { getUserFiatCurrency, persistFiatCurrency } from '../popup/currency-pref';
 
 console.log('ZapArc settings page loaded');
 
@@ -23,6 +24,7 @@ async function loadSettings(): Promise<void> {
         console.log('Settings response:', response);
         
         currentSettings = (response.success && response.data) ? response.data : getDefaultSettings();
+        currentSettings.fiatCurrency = await getUserFiatCurrency();
         console.log('Current settings:', currentSettings);
         
         // Populate form with current settings
@@ -196,6 +198,10 @@ async function saveSettings(): Promise<void> {
             fiatCurrency: (document.getElementById('fiat-currency') as HTMLSelectElement).value as 'usd' | 'eur',
             invoiceExpirySecs
         };
+
+        // Keep one canonical preference for Settings, popup balance,
+        // transaction estimates, and send/receive conversion surfaces.
+        await persistFiatCurrency(newSettings.fiatCurrency);
         
         // Save settings
         console.log('Saving settings:', newSettings);

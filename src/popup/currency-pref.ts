@@ -19,6 +19,19 @@ const FIAT_CURRENCY_KEY = 'fiatCurrencyPreference';
 const DISPLAY_CURRENCY_KEY = 'display_currency';
 const DISPLAY_ORDER: DisplayCurrency[] = ['sats', 'usd', 'eur'];
 
+// Settings can be changed from the dedicated settings page while the popup is
+// still alive. Invalidate this module's per-page cache so every surface reads
+// the newly selected shared preference on its next render.
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== 'local') return;
+        if (changes[FIAT_CURRENCY_KEY] || changes.userSettings) _cached = null;
+        if (changes[DISPLAY_CURRENCY_KEY] || changes[FIAT_CURRENCY_KEY] || changes.userSettings) {
+            _displayCached = null;
+        }
+    });
+}
+
 /**
  * Get the user's selected fiat currency.
  * Returns the in-memory cached value if available, otherwise reads from storage.
@@ -75,12 +88,14 @@ export async function persistFiatCurrency(currency: FiatCurrency): Promise<void>
     const existing = (result?.userSettings || {}) as Partial<UserSettings>;
     await chrome.storage.local.set({
         [FIAT_CURRENCY_KEY]: currency,
+        [DISPLAY_CURRENCY_KEY]: currency,
         userSettings: {
             ...existing,
             fiatCurrency: currency
         }
     });
     _cached = currency;
+    _displayCached = currency;
 }
 
 export async function getDisplayCurrency(): Promise<DisplayCurrency> {
