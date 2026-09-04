@@ -84,7 +84,7 @@ async function checkSparkStatusAndWarn(): Promise<void> {
             }
         }
     } catch (error) {
-        console.warn('⚠️ [Popup-SDK] Spark status check failed:', error);
+        console.warn('⚠️ [Popup-SDK] Spark status check failed; continuing without status alert.');
     }
 }
 
