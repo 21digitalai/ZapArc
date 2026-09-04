@@ -115,6 +115,20 @@ describe('support diagnostics', () => {
         expect(parsed.zaparc.htlcStatusLabel).toContain('not verified');
     });
 
+    it('serializes a failed detailed refresh rather than presenting retained data as current', () => {
+        const parsed = JSON.parse(buildSupportExport(undefined, 0, true, {
+            attempted: true,
+            succeeded: false,
+            error: 'Support refresh timed out after 10 seconds',
+        }));
+
+        expect(parsed.zaparc.authoritativeSync).toEqual({
+            attempted: true,
+            succeeded: false,
+            error: 'Support refresh timed out after 10 seconds',
+        });
+    });
+
     it('includes the complete active wallet session and retained recovery context', () => {
         const startedAt = new Date('2026-08-30T13:00:00.000Z');
         beginSdkLogSession(startedAt);

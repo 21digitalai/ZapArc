@@ -39,7 +39,7 @@ import {
 
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
-import { buildSupportExport } from './support-diagnostics';
+import { buildSupportExport, collectDetailedSupportSnapshot } from './support-diagnostics';
 import { finishWalletImport } from './wallet-import-flow';
 
 // Notification imports
@@ -1067,33 +1067,11 @@ function showTransactionDetail(tx: StoredTransaction): void {
 
         detailedExportButton.disabled = true;
         detailedExportButton.textContent = 'Collecting detailed export…';
-        let livePayment: import('@breeztech/breez-sdk-spark/web').Payment | undefined;
-        let walletInfo: unknown;
-
-        try {
-            if (!breezSDK) throw new Error('Wallet not connected');
-            const syncTimeoutMs = 10_000;
-            await Promise.race([
-                breezSDK.syncWallet({}),
-                new Promise<never>((_, reject) => window.setTimeout(
-                    () => reject(new Error(`SDK log collection timed out after ${syncTimeoutMs / 1000} seconds`)),
-                    syncTimeoutMs,
-                )),
-            ]);
-            const [paymentResponse, infoResponse] = await Promise.all([
-                breezSDK.getPayment({ paymentId: tx.id }),
-                breezSDK.getInfo({ ensureSynced: false }),
-            ]);
-            livePayment = paymentResponse.payment;
-            walletInfo = infoResponse;
-        } catch (_error) {
-            // A bounded best-effort refresh must not prevent exporting the
-            // retained local diagnostics that the user explicitly requested.
-        }
+        const snapshot = await collectDetailedSupportSnapshot(breezSDK || undefined, tx.id);
 
         try {
             await copyExportText(
-                buildSupportExport(livePayment || payment, Number((walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true),
+                buildSupportExport(snapshot.payment || payment, Number((snapshot.walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true, snapshot.refresh),
                 'Detailed support export copied.',
                 'detailed-support',
             );

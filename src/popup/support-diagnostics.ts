@@ -38,6 +38,66 @@ export interface SdkSupportSnapshots {
     syncError?: string;
 }
 
+export interface SupportExportRefreshOutcome {
+    attempted: boolean;
+    succeeded: boolean;
+    error?: string;
+}
+
+export interface DetailedSupportSnapshot {
+    payment?: Payment;
+    walletInfo?: unknown;
+    refresh: SupportExportRefreshOutcome;
+}
+
+interface SupportExportSdk {
+    syncWallet(request: Record<string, never>): Promise<unknown>;
+    getPayment(request: { paymentId: string }): Promise<{ payment?: Payment }>;
+    getInfo(request: { ensureSynced: boolean }): Promise<unknown>;
+}
+
+const SUPPORT_EXPORT_SYNC_TIMEOUT_MS = 10_000;
+
+function formatRefreshError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Refreshes a payment's support context without making export availability
+ * depend on network or SDK health. The outcome is exported so support can
+ * distinguish current SDK data from the retained local snapshot.
+ */
+export async function collectDetailedSupportSnapshot(
+    sdk: SupportExportSdk | undefined,
+    paymentId: string,
+    timeoutMs = SUPPORT_EXPORT_SYNC_TIMEOUT_MS,
+): Promise<DetailedSupportSnapshot> {
+    const refresh: SupportExportRefreshOutcome = { attempted: true, succeeded: false };
+    if (!sdk) {
+        refresh.error = 'Wallet not connected';
+        return { refresh };
+    }
+
+    try {
+        await Promise.race([
+            sdk.syncWallet({}),
+            new Promise<never>((_, reject) => globalThis.setTimeout(
+                () => reject(new Error(`Support refresh timed out after ${timeoutMs / 1000} seconds`)),
+                timeoutMs,
+            )),
+        ]);
+        const [paymentResponse, walletInfo] = await Promise.all([
+            sdk.getPayment({ paymentId }),
+            sdk.getInfo({ ensureSynced: false }),
+        ]);
+        refresh.succeeded = true;
+        return { payment: paymentResponse.payment, walletInfo, refresh };
+    } catch (error) {
+        refresh.error = formatRefreshError(error);
+        return { refresh };
+    }
+}
+
 function removeTrueSecrets(value: string): string {
     return TRUE_SECRET_PATTERNS.reduce((result, pattern) => result.replace(pattern, match => {
         const separator = match.includes('=') ? '=' : ':';
@@ -153,7 +213,12 @@ function buildSanitizedPaymentSummary(payment: Payment | undefined): Record<stri
     };
 }
 
-export function buildSupportExport(payment: Payment | undefined, balanceSats: number, detailed: boolean): string {
+export function buildSupportExport(
+    payment: Payment | undefined,
+    balanceSats: number,
+    detailed: boolean,
+    refresh?: SupportExportRefreshOutcome,
+): string {
     const htlc = getHtlcDetails(payment);
     const snapshot = detailed ? {
         format: 'zaparc-breez-support-v2',
@@ -164,6 +229,7 @@ export function buildSupportExport(payment: Payment | undefined, balanceSats: nu
         },
         zaparc: {
             currentBalanceSats: balanceSats,
+            authoritativeSync: refresh || { attempted: false, succeeded: false, error: 'Not requested' },
             htlcClassification: htlcClassification(htlc?.status),
             historicalLogs: ring.length ? 'recent persisted SDK log window available' : 'unavailable for this older payment',
         },
