@@ -44,7 +44,13 @@ import { buildSdkLogsExport } from './support-diagnostics';
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
 
 // UI helper imports
-import { showBalanceLoading, hideBalanceLoading, showTransactionsLoading, clearWalletDisplay } from './ui-helpers';
+import {
+    showBalanceLoading,
+    hideBalanceLoading,
+    showTransactionsLoading,
+    clearWalletDisplay,
+    resetWalletPinStep,
+} from './ui-helpers';
 
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
@@ -1295,6 +1301,11 @@ function clearSensitiveState(clearSession: boolean = false): void {
 function showWizardStep(stepId: string) {
     console.log(`[Wizard] Showing step: ${stepId}`);
 
+    if (stepId === 'pin-step') {
+        resetWalletPinStep();
+        setUserPin('');
+    }
+
     const steps = [
         'welcome-step',
         'setup-choice-step',
@@ -1496,12 +1507,16 @@ function setupWizardListeners() {
 
     if (createWalletBtn) {
         createWalletBtn.onclick = () => {
+            setIsImportingWallet(false);
+            resetWalletPinStep();
             handleCreateWallet();
         };
     }
 
     if (importWalletBtn) {
         importWalletBtn.onclick = () => {
+            clearSensitiveState();
+            resetWalletPinStep();
             setIsImportingWallet(true); // Importing, not creating
             initializeImportWallet();
             showWizardStep('import-wallet-step');
@@ -1564,7 +1579,12 @@ function setupWizardListeners() {
     const importConfirmBtn = document.getElementById('import-confirm-btn');
 
     if (importBackBtn) {
-        importBackBtn.onclick = () => showWizardStep('setup-choice-step');
+        importBackBtn.onclick = () => {
+            clearSensitiveState();
+            resetWalletPinStep();
+            setIsImportingWallet(false);
+            showWizardStep('setup-choice-step');
+        };
     }
 
     if (importConfirmBtn) {
@@ -1577,6 +1597,8 @@ function setupWizardListeners() {
 
     if (pinBackBtn) {
         pinBackBtn.onclick = () => {
+            resetWalletPinStep();
+            setUserPin('');
             // Go back to appropriate step based on flow
             if (isAddingWallet) {
                 showWizardStep('setup-choice-step');
@@ -2261,6 +2283,8 @@ async function finalizeWalletSetup() {
         // Start auto-lock alarm
         await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
         clearSensitiveState();
+        resetWalletPinStep();
+        setIsImportingWallet(false);
 
     } catch (error) {
         console.error('[Wizard] Error finalizing setup:', error);
@@ -2285,6 +2309,17 @@ function initializeImportWallet() {
 
     // Clear existing inputs
     container.innerHTML = '';
+
+    const suggestions = document.getElementById('word-suggestions');
+    if (suggestions) {
+        suggestions.innerHTML = '';
+        suggestions.style.display = 'none';
+    }
+
+    const importConfirmBtn = document.getElementById('import-confirm-btn') as HTMLButtonElement | null;
+    if (importConfirmBtn) {
+        importConfirmBtn.disabled = true;
+    }
 
     // Create 12 input fields
     for (let i = 1; i <= 12; i++) {

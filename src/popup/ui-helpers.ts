@@ -67,3 +67,23 @@ export function clearWalletDisplay(): void {
     if (settingsRegistered) settingsRegistered.classList.add('hidden');
     if (settingsUnregistered) settingsUnregistered.classList.add('hidden');
 }
+
+export function resetWalletPinStep(): void {
+    const pinInput = document.getElementById('pin-input') as HTMLInputElement | null;
+    const pinConfirm = document.getElementById('pin-confirm') as HTMLInputElement | null;
+    const pinStrength = document.getElementById('pin-strength');
+    const pinContinueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement | null;
+
+    if (pinInput) pinInput.value = '';
+    if (pinConfirm) pinConfirm.value = '';
+
+    if (pinStrength) {
+        pinStrength.textContent = '';
+        pinStrength.classList.add('hidden');
+    }
+
+    if (pinContinueBtn) {
+        pinContinueBtn.disabled = true;
+        pinContinueBtn.textContent = 'Create Wallet';
+    }
+}
