@@ -43,7 +43,9 @@ const SPARK_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 class JsLogger {
     log = (l: LogEntry): void => {
         recordSdkLog(l.level, l.line);
-        console.log(`[BreezSDK ${l.level}] ${l.line}`);
+        // SDK lines may include payment metadata. Retain them only in the
+        // bounded, redacted export flow rather than mirroring them to DevTools.
+        console.debug(`[BreezSDK] retained ${l.level} diagnostic line`);
     };
 }
 
