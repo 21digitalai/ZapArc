@@ -2938,9 +2938,20 @@ async function handleWalletReset(modal: HTMLElement) {
 
         // Disconnect SDK
         if (breezSDK) {
+            // Disconnect is cleanup, not deletion authority. A stalled SDK
+            // connection must not trap the confirmed deletion dialog forever.
+            const disconnectTimeoutMs = 8_000;
             try {
-                await breezSDK.disconnect();
-            } catch (e) { }
+                await Promise.race([
+                    breezSDK.disconnect(),
+                    new Promise<never>((_, reject) => window.setTimeout(
+                        () => reject(new Error(`SDK disconnect timed out after ${disconnectTimeoutMs / 1000} seconds`)),
+                        disconnectTimeoutMs,
+                    )),
+                ]);
+            } catch (error) {
+                console.warn('[Wallet] Continuing deletion after SDK disconnect failure:', error instanceof Error ? error.message : String(error));
+            }
             setBreezSDK(null);
         }
 
