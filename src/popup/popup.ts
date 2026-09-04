@@ -78,6 +78,7 @@ import {
 
 // Wallet Selection imports
 import { showWalletSelectionInterface } from './wallet-selection';
+import { createWalletDeletionTransition } from './wallet-deletion';
 
 // Deposit imports
 import {
@@ -2980,12 +2981,14 @@ async function handleWalletReset(modal: HTMLElement) {
 
                 modal.remove();
 
+                const transition = createWalletDeletionTransition(allWallets, activeWalletId);
+
                 // Remove the deleted wallet from in-memory and rendered selector
                 // state before any other screen can become visible. Otherwise the
                 // next unlock briefly reveals the previous dropdown HTML while the
                 // authoritative wallet list is still loading.
                 hideAllViews();
-                setCurrentWallets(allWallets.filter(wallet => wallet.id !== activeWalletId));
+                setCurrentWallets(transition.remainingWallets);
                 const walletList = document.getElementById('wallet-list');
                 if (walletList) walletList.innerHTML = '';
 
