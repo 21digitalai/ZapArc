@@ -7,6 +7,16 @@ export interface SdkSupportLog {
     sessionId?: string;
 }
 
+interface SdkLogEvidence {
+    at: string;
+    source: string;
+    code: string | null;
+    kind: string;
+    message: string;
+    fingerprint: string;
+    count: number;
+}
+
 const MAX_LOGS = 250;
 const MAX_PERSISTED_BYTES = 3 * 1024 * 1024;
 const STORAGE_KEY = 'zaparc_breez_support_logs_v1';
@@ -287,6 +297,52 @@ function collectPaymentCorrelationValues(payment?: PaymentLogCorrelation): strin
     return [...values];
 }
 
+function isRoutineSyncLog(entry: SdkSupportLog): boolean {
+    return entry.level.toUpperCase() === 'INFO' && /\b(sync|synced|syncing|refresh)\b/i.test(entry.line);
+}
+
+function logFingerprint(entry: SdkSupportLog): string {
+    return `${entry.level.toUpperCase()}:${entry.line
+        .replace(/[0-9a-f]{8,}/gi, '<id>')
+        .replace(/\d+/g, '<n>')
+        .slice(0, 180)}`;
+}
+
+function structuredLogEvidence(entries: SdkSupportLog[]): SdkLogEvidence[] {
+    const grouped = new Map<string, SdkLogEvidence>();
+    entries.forEach(entry => {
+        const fingerprint = logFingerprint(entry);
+        const existing = grouped.get(fingerprint);
+        if (existing) {
+            existing.count += 1;
+            return;
+        }
+        const code = /\b(?:code|kind)\s*[=:]\s*([^\s,;]+)/i.exec(entry.line)?.[1] || null;
+        grouped.set(fingerprint, {
+            at: entry.at,
+            source: 'Breez SDK',
+            code,
+            kind: entry.level.toUpperCase(),
+            message: entry.line,
+            fingerprint,
+            count: 1,
+        });
+    });
+    return [...grouped.values()];
+}
+
+function buildLifecycleTimeline(
+    payment: PaymentLogCorrelation | undefined,
+    snapshots: SdkSupportSnapshots | undefined,
+    generatedAt: string,
+): Array<Record<string, unknown>> {
+    const events: Array<Record<string, unknown>> = [];
+    const paymentAt = paymentTimestampMs(payment);
+    if (paymentAt !== undefined) events.push({ at: new Date(paymentAt).toISOString(), kind: 'payment-recorded', status: payment?.status || null });
+    if (snapshots) events.push({ at: generatedAt, kind: 'authoritative-sync', succeeded: snapshots.syncSucceeded, error: snapshots.syncError || null });
+    return events;
+}
+
 /**
  * Export the full retained Breez SDK context for support. Ordinary payment
  * identifiers, invoices, addresses, pubkeys and paths are preserved. Only
@@ -315,6 +371,9 @@ export function buildSdkLogsExport(
 
     const nativePayment = snapshots?.payment;
     const htlc = getHtlcDetails(nativePayment);
+    const routineSyncLogs = ring.filter(isRoutineSyncLog);
+    const warningAndErrorLogs = ring.filter(entry => /^(WARN|WARNING|ERROR)$/i.test(entry.level));
+    const detailedLogs = ring.filter(entry => !isRoutineSyncLog(entry));
 
     return JSON.stringify(sanitizeSupportValue({
         schemaVersion: 1,
@@ -342,7 +401,7 @@ export function buildSdkLogsExport(
             retainedEntries: ring.length,
             persisted: true,
             sanitized: false,
-            note: 'The full bounded SDK history is included so wallet import/recovery and historical resync evidence is not discarded merely because it does not match the selected payment.',
+            note: 'A bounded local history is retained. Routine INFO sync chatter is compacted below; detailed WARN and ERROR evidence is preserved.',
         },
         warning: 'Contains detailed wallet and payment metadata. Share only with a trusted support recipient.',
         breez: {
@@ -359,12 +418,21 @@ export function buildSdkLogsExport(
             note: nativePayment
                 ? 'Breez-native payment and wallet snapshots were captured after a fresh sync. ZapArc interpretation is kept separate.'
                 : 'No live Breez payment snapshot was available; retained SDK logs and cached correlation are included.',
+            lifecycleTimeline: buildLifecycleTimeline(payment, snapshots, generatedAt),
+        },
+        sdkLogSummary: {
+            routineInfoSync: structuredLogEvidence(routineSyncLogs),
+            routineInfoSyncCount: routineSyncLogs.length,
+            warningAndErrorEvidence: structuredLogEvidence(warningAndErrorLogs),
+            historicalPaymentWindow: paymentTimeWindow.length
+                ? 'payment-time logs retained locally'
+                : 'unavailable for this older payment; current live payment and recent sync evidence are included when available',
         },
         exactPaymentLogs: prepareLogs(exactPaymentLogs),
         paymentTimeWindowAvailable: paymentTimeWindow.length > 0,
         paymentTimeWindowLogs: prepareLogs(paymentTimeWindow),
         recentWindowLogs: prepareLogs(recentWindow),
         currentSdkSessionLogs: prepareLogs(currentSessionLogs),
-        fullRetainedSdkLogs: prepareLogs(ring),
+        detailedRetainedSdkLogs: prepareLogs(detailedLogs),
     }, false), (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2);
 }

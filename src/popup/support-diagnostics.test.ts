@@ -136,7 +136,24 @@ describe('support diagnostics', () => {
 
         const parsed = JSON.parse(buildSdkLogsExport(undefined, undefined, new Date('2026-08-30T13:00:02.000Z')));
         expect(parsed.currentSdkSessionLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
-        expect(parsed.fullRetainedSdkLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
+        expect(parsed.detailedRetainedSdkLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
         expect(parsed.retention.maxEntries).toBe(250);
+    });
+
+    it('compacts routine sync chatter while preserving structured warning and error evidence', () => {
+        const now = new Date('2026-09-04T14:00:00.000Z');
+        recordSdkLog('INFO', 'wallet sync completed height=101', now);
+        recordSdkLog('INFO', 'wallet sync completed height=102', now);
+        recordSdkLog('WARN', 'sync code=TEMPORARY network delayed', now);
+        recordSdkLog('ERROR', 'sync kind=transport connection failed', now);
+
+        const parsed = JSON.parse(buildSdkLogsExport(undefined, undefined, now));
+        expect(parsed.sdkLogSummary.routineInfoSyncCount).toBeGreaterThanOrEqual(2);
+        expect(parsed.sdkLogSummary.routineInfoSync.some((entry: { count: number }) => entry.count >= 2)).toBe(true);
+        expect(parsed.sdkLogSummary.warningAndErrorEvidence).toEqual(expect.arrayContaining([
+            expect.objectContaining({ source: 'Breez SDK', kind: 'WARN', code: 'TEMPORARY', count: 1 }),
+            expect.objectContaining({ source: 'Breez SDK', kind: 'ERROR', code: 'transport', count: 1 }),
+        ]));
+        expect(parsed.detailedRetainedSdkLogs.some((entry: SdkSupportLog) => entry.line.includes('wallet sync completed'))).toBe(false);
     });
 });

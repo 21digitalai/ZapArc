@@ -39,7 +39,7 @@ import {
 
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
-import { buildSupportExport, collectDetailedSupportSnapshot } from './support-diagnostics';
+import { buildSdkLogsExport, buildSupportExport, collectDetailedSupportSnapshot } from './support-diagnostics';
 import { copySupportExport, createDetailedSupportExportHandler } from './detailed-support-export';
 import { finishWalletImport } from './wallet-import-flow';
 
@@ -1060,7 +1060,12 @@ function showTransactionDetail(tx: StoredTransaction): void {
         ),
         collect: () => collectDetailedSupportSnapshot(breezSDK || undefined, tx.id),
         exportSnapshot: snapshot => copyExportText(
-            buildSupportExport(snapshot.payment || payment, Number((snapshot.walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true, snapshot.refresh),
+            buildSdkLogsExport(payment, {
+                payment: snapshot.payment,
+                walletInfo: snapshot.walletInfo,
+                syncSucceeded: snapshot.refresh.succeeded,
+                syncError: snapshot.refresh.error,
+            }),
             'Detailed support export copied.',
             'detailed-support',
         ),
