@@ -39,6 +39,7 @@ import {
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
 import { buildSdkLogsExport } from './support-diagnostics';
+import { finishWalletImport } from './wallet-import-flow';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -2185,20 +2186,24 @@ async function handlePinConfirm() {
         // Skip the completion screen and directly finalize setup
         // This avoids the "Opening..." button getting stuck
         console.log('[Wizard] Skipping completion screen, opening wallet directly');
-        const didFinalize = await finalizeWalletSetup();
-        if (!didFinalize) {
-            clearSensitiveState();
-            resetWalletPinStep();
-            setIsImportingWallet(false);
-            showWizardStep('setup-choice-step');
-            return;
-        }
-
-        // Start sub-wallet discovery in the background (non-blocking)
-        // This runs after the main UI is shown, scanning for existing sub-wallets
-        console.log('[Wizard] Starting background sub-wallet discovery...');
-        startSubWalletDiscovery(masterKeyId, generatedMnemonic).catch(err => {
-            console.warn('[Wizard] Background discovery error (non-fatal):', err);
+        const mnemonicForDiscovery = generatedMnemonic;
+        await finishWalletImport({
+            masterKeyId,
+            mnemonic: mnemonicForDiscovery,
+            finalize: finalizeWalletSetup,
+            recover: () => {
+                clearSensitiveState();
+                resetWalletPinStep();
+                setIsImportingWallet(false);
+                showWizardStep('setup-choice-step');
+            },
+            startDiscovery: async (walletId, mnemonic) => {
+                console.log('[Wizard] Starting background sub-wallet discovery...');
+                await startSubWalletDiscovery(walletId, mnemonic);
+            },
+            onDiscoveryError: err => {
+                console.warn('[Wizard] Background discovery error (non-fatal):', err);
+            },
         });
         
     } catch (error) {
