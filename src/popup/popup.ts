@@ -29,6 +29,7 @@ import {
     setIsImportingWallet,
     currentWallets,
     setCurrentWallets,
+    setActiveWalletId,
     BIP39_WORDS,
     setIsSDKInitialized,
     getMasterKeys,
@@ -2999,6 +3000,7 @@ async function handleWalletReset(modal: HTMLElement) {
                 setIsWalletUnlocked(false);
                 setCurrentBalance(0);
                 setBreezSDK(null);
+                setActiveWalletId(null);
                 setActiveMasterKeyId(null);
                 setActiveSubWalletIndex(0);
                 clearWalletDisplay();
@@ -3025,8 +3027,10 @@ async function handleWalletReset(modal: HTMLElement) {
             await chrome.storage.session.clear();
 
             // Reset state
+            hideAllViews();
             setIsWalletUnlocked(false);
             setCurrentBalance(0);
+            setActiveWalletId(null);
             setGeneratedMnemonic('');
             setMnemonicWords([]);
             setSelectedWords([]);
