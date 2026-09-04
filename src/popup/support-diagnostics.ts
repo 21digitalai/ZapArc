@@ -7,7 +7,7 @@ export interface SdkSupportLog {
     sessionId?: string;
 }
 
-const MAX_LOGS = 2_000;
+const MAX_LOGS = 250;
 const MAX_PERSISTED_BYTES = 3 * 1024 * 1024;
 const STORAGE_KEY = 'zaparc_breez_support_logs_v1';
 const TRUE_SECRET_KEYS = /seed|mnemonic|private.?key|preimage|proof|api.?key|access.?token|refresh.?token|authorization/i;
@@ -134,12 +134,31 @@ function getHtlcDetails(payment?: Payment): Record<string, unknown> | undefined 
     return details.htlcDetails as unknown as Record<string, unknown>;
 }
 
+/**
+ * Sanitized exports deliberately use an allowlist rather than redacting a
+ * complete Breez response. SDK payment payloads can gain identifier-bearing
+ * fields without ZapArc knowing their names, so a denylist is not safe here.
+ */
+function buildSanitizedPaymentSummary(payment: Payment | undefined): Record<string, unknown> | null {
+    if (!payment) return null;
+    const htlc = getHtlcDetails(payment);
+    return {
+        status: payment.status || null,
+        paymentType: payment.paymentType || null,
+        method: payment.method || null,
+        amount: payment.amount ?? null,
+        fees: payment.fees ?? null,
+        timestamp: payment.timestamp ?? null,
+        htlcStatus: htlc?.status || null,
+    };
+}
+
 export function buildSupportExport(payment: Payment | undefined, balanceSats: number, detailed: boolean): string {
     const htlc = getHtlcDetails(payment);
-    const snapshot = {
+    const snapshot = detailed ? {
         format: 'zaparc-breez-support-v2',
         generatedAt: new Date().toISOString(),
-        privacy: detailed ? 'detailed user-approved export' : 'sanitized support export',
+        privacy: 'detailed user-approved export',
         breez: {
             payment: payment || null,
         },
@@ -149,9 +168,26 @@ export function buildSupportExport(payment: Payment | undefined, balanceSats: nu
             historicalLogs: ring.length ? 'recent persisted SDK log window available' : 'unavailable for this older payment',
         },
         sdkLogs: ring,
+    } : {
+        format: 'zaparc-breez-support-v2',
+        generatedAt: new Date().toISOString(),
+        privacy: 'sanitized support export',
+        breez: {
+            // Safe across future SDK response fields: this is a fixed allowlist.
+            payment: buildSanitizedPaymentSummary(payment),
+        },
+        zaparc: {
+            currentBalanceSats: balanceSats,
+            htlcClassification: htlcClassification(htlc?.status),
+            historicalLogs: 'not included in sanitized export',
+        },
+        sdkLogs: {
+            included: false,
+            reason: 'SDK log lines can contain payment identifiers and are only included in detailed user-approved exports.',
+        },
     };
     return JSON.stringify(
-        sanitizeSupportValue(snapshot, !detailed),
+        sanitizeSupportValue(snapshot, false),
         (_key, value) => typeof value === 'bigint' ? value.toString() : value,
         2,
     );

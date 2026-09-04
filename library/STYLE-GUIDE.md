@@ -114,3 +114,11 @@
 `.save-contact-cancel`, `.save-contact-save` — semantic anchors for the prompt action buttons; compose with shared button utility classes.
 
 `.settings-action-btn` with `.lightning-address-section` — settings disclosure pattern. Invoice expiry uses this existing disclosure with native select/input controls, clear labels, and inline validation.
+
+### Transaction diagnostics
+
+`.tx-diagnostics-actions` — transaction-detail diagnostics action group.
+
+`.tx-diagnostics-note` — privacy/status explanation above diagnostics controls.
+
+`.tx-diagnostics-btn` — shared transaction diagnostics button; compose `.tx-diagnostics-danger` for the detailed SDK-log export because it can contain payment metadata.

@@ -13,14 +13,21 @@ describe('support diagnostics', () => {
 
     it('keeps a bounded log ring and uses cautious returned classification', () => {
         for (let index = 0; index < 255; index++) recordSdkLog('DEBUG', `line ${index}`);
-        expect(recentSdkLogs().length).toBeLessThanOrEqual(2_000);
+        expect(recentSdkLogs().length).toBeLessThanOrEqual(250);
         expect(htlcClassification('Returned')).toContain('not verified');
     });
 
-    it('redacts identifiers only from the sanitized export', () => {
+    it('uses an explicit allowlist for the sanitized export and retains detailed context only after approval', () => {
         const payment = { id: 'payment-id', status: 'pending', paymentType: 'receive', amount: 2n, fees: 0n, timestamp: 1, method: 'lightning', details: { type: 'lightning', invoice: 'lnbc123', destinationPubkey: 'pubkey', htlcDetails: { paymentHash: 'hash', expiryTime: 10, status: 'waitingForPreimage' } } } as const;
-        expect(buildSupportExport(payment, 10, false)).not.toContain('payment-id');
-        expect(buildSupportExport(payment, 10, true)).toContain('payment-id');
+        recordSdkLog('DEBUG', 'payment id=payment-id invoice=lnbc123');
+        const sanitized = buildSupportExport(payment, 10, false);
+        const detailed = buildSupportExport(payment, 10, true);
+        expect(sanitized).not.toContain('payment-id');
+        expect(sanitized).not.toContain('lnbc123');
+        expect(sanitized).not.toContain('destinationPubkey');
+        expect(sanitized).toContain('not included in sanitized export');
+        expect(detailed).toContain('payment-id');
+        expect(detailed).toContain('lnbc123');
     });
 
     it('serializes bigint values anywhere in the Breez response', () => {
@@ -116,6 +123,6 @@ describe('support diagnostics', () => {
         const parsed = JSON.parse(buildSdkLogsExport(undefined, undefined, new Date('2026-08-30T13:00:02.000Z')));
         expect(parsed.currentSdkSessionLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
         expect(parsed.fullRetainedSdkLogs.some((entry: SdkSupportLog) => entry.line.includes('historical recovery query'))).toBe(true);
-        expect(parsed.retention.maxEntries).toBe(2_000);
+        expect(parsed.retention.maxEntries).toBe(250);
     });
 });
