@@ -124,7 +124,7 @@ export async function showPINModal(message: string): Promise<string | null> {
         modalState.rejectCallback = reject;
 
         const messageEl = document.getElementById('pin-modal-message');
-        const inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
+        let inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
         const errorEl = document.getElementById('pin-modal-error');
         const confirmBtn = document.getElementById('pin-modal-confirm');
         const cancelBtn = document.getElementById('pin-modal-cancel');
@@ -133,6 +133,8 @@ export async function showPINModal(message: string): Promise<string | null> {
             resolve(null);
             return;
         }
+
+        inputEl = replaceModalInput(inputEl);
 
         // Setup modal
         messageEl.textContent = message;
@@ -242,7 +244,7 @@ export async function promptForText(message: string, defaultValue: string = '', 
         modalState.rejectCallback = reject;
 
         const messageEl = document.getElementById('pin-modal-message');
-        const inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
+        let inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
         const errorEl = document.getElementById('pin-modal-error');
         const confirmBtn = document.getElementById('pin-modal-confirm');
         const cancelBtn = document.getElementById('pin-modal-cancel');
@@ -252,6 +254,8 @@ export async function promptForText(message: string, defaultValue: string = '', 
             return;
         }
 
+        inputEl = replaceModalInput(inputEl);
+
         // Setup modal for text input
         messageEl.textContent = message;
         inputEl.value = defaultValue;
@@ -259,7 +263,7 @@ export async function promptForText(message: string, defaultValue: string = '', 
         inputEl.setAttribute('placeholder', placeholder || 'Enter text');
         inputEl.removeAttribute('inputmode');
         inputEl.removeAttribute('pattern');
-        inputEl.removeAttribute('maxlength');
+        inputEl.setAttribute('maxlength', '30');
         errorEl?.classList.add('hidden');
         
         // Update modal title (find h2/h3 in the modal)
@@ -307,6 +311,17 @@ export async function promptForText(message: string, defaultValue: string = '', 
 
         showModal('pin-modal');
     });
+}
+
+/**
+ * Each modal mode registers mode-specific input listeners. Replacing the shared
+ * input clears listeners from the previous mode, so a PIN-only digit filter
+ * cannot leak into a later wallet-name prompt.
+ */
+function replaceModalInput(input: HTMLInputElement): HTMLInputElement {
+    const replacement = input.cloneNode(true) as HTMLInputElement;
+    input.replaceWith(replacement);
+    return replacement;
 }
 
 // ========================================
