@@ -140,6 +140,23 @@ describe('support diagnostics', () => {
         expect(parsed.retention.maxEntries).toBe(250);
     });
 
+    it('marks an old payment window unavailable while retaining current sync evidence', () => {
+        const oldPayment = {
+            id: 'old-payment', status: 'pending', paymentType: 'receive', amount: 16n,
+            timestamp: new Date('2020-01-01T00:00:00.000Z').getTime(), method: 'lightning', details: { type: 'lightning' },
+        } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+        const parsed = JSON.parse(buildSdkLogsExport(oldPayment, {
+            payment: oldPayment,
+            walletInfo: { balanceSats: 21n },
+            syncSucceeded: true,
+        }, new Date('2026-09-04T14:00:00.000Z')));
+
+        expect(parsed.paymentTimeWindowAvailable).toBe(false);
+        expect(parsed.sdkLogSummary.historicalPaymentWindow).toContain('unavailable for this older payment');
+        expect(parsed.breez.paymentSnapshot.id).toBe('old-payment');
+        expect(parsed.zaparc.authoritativeSync.succeeded).toBe(true);
+    });
+
     it('compacts routine sync chatter while preserving structured warning and error evidence', () => {
         const now = new Date('2026-09-04T14:00:00.000Z');
         recordSdkLog('INFO', 'wallet sync completed height=101', now);
