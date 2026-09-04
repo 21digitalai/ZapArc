@@ -39,11 +39,11 @@ import {
 
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
-import { buildSdkLogsExport } from './support-diagnostics';
+import { buildSupportExport } from './support-diagnostics';
 import { finishWalletImport } from './wallet-import-flow';
 
 // Notification imports
-import { showNotification, showError, showSuccess, showInfo } from './notifications';
+import { showNotification, showConfirmDialog, showError, showSuccess, showInfo } from './notifications';
 
 // UI helper imports
 import {
@@ -958,9 +958,10 @@ function showTransactionDetail(tx: StoredTransaction): void {
             ${detailRows}
         </div>
         <div class="tx-diagnostics-actions">
-            <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. It does not upload support data.</p>
+            <p class="tx-diagnostics-note">Check payment status synchronizes with Breez and re-reads this payment. Support exports stay on this device: sanitized excludes identifiers and logs; detailed includes support context only after confirmation.</p>
             <button class="tx-diagnostics-btn" id="tx-check-status">Check payment status</button>
-            <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-sdk-logs">Copy SDK logs</button>
+            <button class="tx-diagnostics-btn" id="tx-copy-sanitized-export">Copy sanitized support export</button>
+            <button class="tx-diagnostics-btn tx-diagnostics-danger" id="tx-copy-detailed-export">Copy detailed support export</button>
         </div>
     `;
 
@@ -1041,15 +1042,33 @@ function showTransactionDetail(tx: StoredTransaction): void {
         amount: tx.amount,
         fees: tx.feeSats,
         method: tx.method,
-    };
-    const sdkLogsButton = document.getElementById('tx-copy-sdk-logs') as HTMLButtonElement | null;
-    if (sdkLogsButton) sdkLogsButton.addEventListener('click', async () => {
-        sdkLogsButton.disabled = true;
-        sdkLogsButton.textContent = 'Collecting SDK logs…';
+    } as unknown as import('@breeztech/breez-sdk-spark/web').Payment;
+    const sanitizedExportButton = document.getElementById('tx-copy-sanitized-export') as HTMLButtonElement | null;
+    if (sanitizedExportButton) sanitizedExportButton.addEventListener('click', async () => {
+        sanitizedExportButton.disabled = true;
+        sanitizedExportButton.textContent = 'Preparing sanitized export…';
+        try {
+            await copyExportText(buildSupportExport(payment, 0, false), 'Sanitized support export copied.', 'sanitized-support');
+        } catch (error) {
+            showError(String(error));
+        } finally {
+            sanitizedExportButton.disabled = false;
+            sanitizedExportButton.textContent = 'Copy sanitized support export';
+        }
+    });
+
+    const detailedExportButton = document.getElementById('tx-copy-detailed-export') as HTMLButtonElement | null;
+    if (detailedExportButton) detailedExportButton.addEventListener('click', async () => {
+        const confirmed = await showConfirmDialog(
+            'Export detailed support data?',
+            'This export can include transaction metadata and recent SDK logs. It stays on your device until you choose to share it with support.',
+        );
+        if (!confirmed) return;
+
+        detailedExportButton.disabled = true;
+        detailedExportButton.textContent = 'Collecting detailed export…';
         let livePayment: import('@breeztech/breez-sdk-spark/web').Payment | undefined;
         let walletInfo: unknown;
-        let syncSucceeded = false;
-        let syncError: string | undefined;
 
         try {
             if (!breezSDK) throw new Error('Wallet not connected');
@@ -1061,33 +1080,28 @@ function showTransactionDetail(tx: StoredTransaction): void {
                     syncTimeoutMs,
                 )),
             ]);
-            syncSucceeded = true;
             const [paymentResponse, infoResponse] = await Promise.all([
                 breezSDK.getPayment({ paymentId: tx.id }),
                 breezSDK.getInfo({ ensureSynced: false }),
             ]);
             livePayment = paymentResponse.payment;
             walletInfo = infoResponse;
-        } catch (error) {
-            syncError = error instanceof Error ? error.message : String(error);
+        } catch (_error) {
+            // A bounded best-effort refresh must not prevent exporting the
+            // retained local diagnostics that the user explicitly requested.
         }
 
         try {
             await copyExportText(
-                buildSdkLogsExport(livePayment || payment, {
-                    payment: livePayment,
-                    walletInfo,
-                    syncSucceeded,
-                    syncError,
-                }),
-                'SDK logs copied.',
-                'sdk-logs',
+                buildSupportExport(livePayment || payment, Number((walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true),
+                'Detailed support export copied.',
+                'detailed-support',
             );
         } catch (error) {
             showError(String(error));
         } finally {
-            sdkLogsButton.disabled = false;
-            sdkLogsButton.textContent = 'Copy SDK logs';
+            detailedExportButton.disabled = false;
+            detailedExportButton.textContent = 'Copy detailed support export';
         }
     });
 
