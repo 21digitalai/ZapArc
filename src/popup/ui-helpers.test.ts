@@ -76,5 +76,20 @@ describe('resetWalletPinStep', () => {
             disabled: true,
             textContent: 'Create Wallet',
         });
+
+        elements['pin-input'].value = '654321';
+        elements['pin-confirm'].value = '654321';
+        elements['pin-strength'].textContent = 'PIN is valid';
+        elements['pin-continue-btn'].textContent = 'Creating wallet...';
+
+        resetWalletPinStep();
+
+        expect(elements['pin-input'].value).toBe('');
+        expect(elements['pin-confirm'].value).toBe('');
+        expect(elements['pin-strength'].textContent).toBe('');
+        expect(elements['pin-continue-btn']).toMatchObject({
+            disabled: true,
+            textContent: 'Create Wallet',
+        });
     });
 });

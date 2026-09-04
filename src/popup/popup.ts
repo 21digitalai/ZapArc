@@ -2185,7 +2185,14 @@ async function handlePinConfirm() {
         // Skip the completion screen and directly finalize setup
         // This avoids the "Opening..." button getting stuck
         console.log('[Wizard] Skipping completion screen, opening wallet directly');
-        await finalizeWalletSetup();
+        const didFinalize = await finalizeWalletSetup();
+        if (!didFinalize) {
+            clearSensitiveState();
+            resetWalletPinStep();
+            setIsImportingWallet(false);
+            showWizardStep('setup-choice-step');
+            return;
+        }
 
         // Start sub-wallet discovery in the background (non-blocking)
         // This runs after the main UI is shown, scanning for existing sub-wallets
@@ -2206,7 +2213,7 @@ async function handlePinConfirm() {
     }
 }
 
-async function finalizeWalletSetup() {
+async function finalizeWalletSetup(): Promise<boolean> {
     console.log('[Wizard] Finalizing wallet setup');
 
     const completeSetupBtn = document.getElementById('complete-setup-btn') as HTMLButtonElement;
@@ -2285,6 +2292,7 @@ async function finalizeWalletSetup() {
         clearSensitiveState();
         resetWalletPinStep();
         setIsImportingWallet(false);
+        return true;
 
     } catch (error) {
         console.error('[Wizard] Error finalizing setup:', error);
@@ -2294,6 +2302,7 @@ async function finalizeWalletSetup() {
             completeSetupBtn.disabled = false;
             completeSetupBtn.textContent = 'Start Using Wallet';
         }
+        return false;
     }
 }
 
