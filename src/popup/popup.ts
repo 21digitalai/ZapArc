@@ -40,6 +40,7 @@ import {
 // SDK imports
 import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow, refreshPaymentStatus } from './sdk';
 import { buildSupportExport, collectDetailedSupportSnapshot } from './support-diagnostics';
+import { copySupportExport, createDetailedSupportExportHandler } from './detailed-support-export';
 import { finishWalletImport } from './wallet-import-flow';
 
 // Notification imports
@@ -1015,19 +1016,13 @@ function showTransactionDetail(tx: StoredTransaction): void {
     });
 
     const copyExportText = async (exportText: string, successMessage: string, filenamePrefix: string): Promise<void> => {
-        try {
-            await copyToClipboard(exportText, successMessage);
-        } catch (error) {
-            // Chrome can reject large clipboard writes or lose the transient user
-            // activation while preparing an export. Never report a false success:
-            // preserve the evidence as a JSON download instead.
-            downloadTextFile(
-                exportText,
-                `zaparc-${filenamePrefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-            );
-            console.warn('[Popup] Clipboard export failed; downloaded JSON instead:', error);
-            showSuccess('Clipboard was unavailable. Support logs downloaded as JSON instead.');
-        }
+        await copySupportExport(exportText, successMessage, filenamePrefix, {
+            copy: copyToClipboard,
+            download: downloadTextFile,
+            notifyFallback: () => showSuccess('Clipboard was unavailable. Support logs downloaded as JSON instead.'),
+            warn: error => console.warn('[Popup] Clipboard export failed; downloaded JSON instead:', error),
+            now: () => new Date(),
+        });
     };
     // Native Breez 0.23.x payments contain bigint fields and therefore cannot be
     // stored in chrome.storage. Rebuild the correlation context from the safe
@@ -1058,30 +1053,19 @@ function showTransactionDetail(tx: StoredTransaction): void {
     });
 
     const detailedExportButton = document.getElementById('tx-copy-detailed-export') as HTMLButtonElement | null;
-    if (detailedExportButton) detailedExportButton.addEventListener('click', async () => {
-        const confirmed = await showConfirmDialog(
+    if (detailedExportButton) detailedExportButton.addEventListener('click', createDetailedSupportExportHandler(detailedExportButton, {
+        confirm: () => showConfirmDialog(
             'Export detailed support data?',
             'This export can include transaction metadata and recent SDK logs. It stays on your device until you choose to share it with support.',
-        );
-        if (!confirmed) return;
-
-        detailedExportButton.disabled = true;
-        detailedExportButton.textContent = 'Collecting detailed export…';
-        const snapshot = await collectDetailedSupportSnapshot(breezSDK || undefined, tx.id);
-
-        try {
-            await copyExportText(
-                buildSupportExport(snapshot.payment || payment, Number((snapshot.walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true, snapshot.refresh),
-                'Detailed support export copied.',
-                'detailed-support',
-            );
-        } catch (error) {
-            showError(String(error));
-        } finally {
-            detailedExportButton.disabled = false;
-            detailedExportButton.textContent = 'Copy detailed support export';
-        }
-    });
+        ),
+        collect: () => collectDetailedSupportSnapshot(breezSDK || undefined, tx.id),
+        exportSnapshot: snapshot => copyExportText(
+            buildSupportExport(snapshot.payment || payment, Number((snapshot.walletInfo as { balanceSats?: number | bigint } | undefined)?.balanceSats || 0), true, snapshot.refresh),
+            'Detailed support export copied.',
+            'detailed-support',
+        ),
+        reportError: error => showError(String(error)),
+    }));
 
     // Show modal
     overlay.classList.remove('hidden');
