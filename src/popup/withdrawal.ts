@@ -13,6 +13,7 @@ import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, formatSelectedCurrencyAmount, getBtcSpotPrice, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency, type DisplayCurrency } from './currency-pref';
 import { nonblankPaymentComment, preparedPaymentComment, savePaymentComment } from './payment-comment';
+import { calculateSendBalanceSummary, type SendBalanceSummary } from './send-balance-summary';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -36,6 +37,43 @@ let preparedCommentAtPreview: string | undefined;
 let sendInputCurrency: DisplayCurrency = 'sats';
 let userFiatCurrency: FiatCurrency = 'usd';
 const SEND_INPUT_CURRENCY_KEY = 'send_input_currency';
+let sendBalancesHidden = false;
+let lastSendBalanceSummary: SendBalanceSummary | null = null;
+
+function formatSensitiveSats(sats: number | null): string {
+    if (sendBalancesHidden) return '••••••';
+    return sats === null ? 'Fee unavailable' : `${sats.toLocaleString()} sats`;
+}
+
+function renderSendBalanceSummary(summary: SendBalanceSummary): void {
+    lastSendBalanceSummary = summary;
+    const spendable = document.getElementById('withdraw-balance-display');
+    const entryStatus = document.getElementById('send-balance-entry-status');
+    const previewSpendable = document.getElementById('preview-spendable');
+    const previewRemaining = document.getElementById('preview-remaining');
+    const previewStatus = document.getElementById('preview-balance-status');
+    if (spendable) spendable.textContent = formatSensitiveSats(summary.spendableSats);
+    if (previewSpendable) previewSpendable.textContent = formatSensitiveSats(summary.spendableSats);
+    if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(summary.remainingSats);
+
+    const status = summary.hasSufficientFunds === false
+        ? 'Insufficient funds for amount and fee.'
+        : summary.hasSufficientFunds === true
+            ? 'Sufficient funds for amount and fee.'
+            : 'Fee unavailable — remaining balance cannot be calculated yet.';
+    [entryStatus, previewStatus].forEach((element) => {
+        if (!element) return;
+        element.textContent = status;
+        element.classList.toggle('insufficient', summary.hasSufficientFunds === false);
+        element.classList.toggle('sufficient', summary.hasSufficientFunds === true);
+    });
+}
+
+function updateEntryBalanceSummary(): void {
+    const input = document.getElementById('withdrawal-amount') as HTMLInputElement | null;
+    const amount = input ? Number(input.value) : 0;
+    renderSendBalanceSummary(calculateSendBalanceSummary(currentBalance, amount, null));
+}
 
 /** Load the user's fiat unit plus Send's independent amount-input preference. */
 async function loadFiatCurrencySetting(): Promise<void> {
@@ -248,8 +286,7 @@ export function showWithdrawalInterface(): void {
     mainInterface?.classList.add('hidden');
     withdrawInterface?.classList.remove('hidden');
 
-    const balanceDisplay = document.getElementById('withdraw-balance-display');
-    if (balanceDisplay) balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
+    updateEntryBalanceSummary();
 
     // Load fiat currency preference before resetting form
     loadFiatCurrencySetting()
@@ -399,6 +436,7 @@ export function setupWithdrawalListeners(): void {
     amountInput?.addEventListener('input', () => {
         validateWithdrawalForm();
         updateConversionHint();
+        renderSendBalanceSummary(lastSendBalanceSummary || calculateSendBalanceSummary(currentBalance, 0, null));
     });
     previewBtn?.addEventListener('click', previewPayment);
 
@@ -419,6 +457,14 @@ export function setupWithdrawalListeners(): void {
         validateWithdrawalForm();
     });
     sendBtn?.addEventListener('click', () => sendPayment());
+    const privacyToggle = document.getElementById('send-balance-privacy-toggle') as HTMLButtonElement | null;
+    privacyToggle?.addEventListener('click', () => {
+        sendBalancesHidden = !sendBalancesHidden;
+        privacyToggle.textContent = sendBalancesHidden ? '◌' : '◉';
+        privacyToggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
+        privacyToggle.setAttribute('aria-pressed', String(sendBalancesHidden));
+        updateEntryBalanceSummary();
+    });
 
     const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
     const onchainAmountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
@@ -741,9 +787,9 @@ export async function previewPayment(): Promise<void> {
 
             setPreparedPayment(prepared);
             preparedCommentAtPreview = preparedPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value);
-            const prepFee = prepared.paymentMethod?.type === 'bolt11Invoice' 
-                ? Number(prepared.paymentMethod.lightningFeeSats || 0) 
-                : 0;
+            const prepFee = prepared.paymentMethod?.type === 'bolt11Invoice' && typeof prepared.paymentMethod.lightningFeeSats === 'number'
+                ? Number(prepared.paymentMethod.lightningFeeSats)
+                : undefined;
             const invoiceAmount = Number(prepared.amount || 0) || amount || 0;
 
             // If invoice has a built-in amount, show it in the (disabled) amount field
@@ -835,10 +881,13 @@ export function displayPaymentPreview(previewData: any): void {
     const commentEl = document.getElementById('preview-comment');
 
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
-    const total = previewData.amount + previewData.fee;
+    const fee = typeof previewData.fee === 'number' && Number.isFinite(previewData.fee) ? previewData.fee : null;
+    const summary = calculateSendBalanceSummary(currentBalance, previewData.amount, fee);
+    const total = summary.totalSats;
     setPreviewAmount(amountEl, previewData.amount, previewData.enteredAmount, previewData.enteredCurrency);
-    setPreviewAmount(feeEl, previewData.fee);
+    setPreviewAmount(feeEl, fee);
     setPreviewAmount(totalEl, total);
+    renderSendBalanceSummary(summary);
     const comment = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value) || '';
     if (commentRow && commentEl) {
         commentEl.textContent = comment;
@@ -847,7 +896,7 @@ export function displayPaymentPreview(previewData: any): void {
 
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
-    sendBtn.disabled = false;
+    sendBtn.disabled = summary.hasSufficientFunds !== true;
 
     if (previewData.type === 'lnurl' && typeof previewData.recipient === 'string') {
         showPreviewSaveContactPrompt(previewData.recipient);
@@ -858,7 +907,7 @@ export function displayPaymentPreview(previewData: any): void {
 
 function setPreviewAmount(
     element: HTMLElement | null,
-    sats: number,
+    sats: number | null,
     enteredAmount?: string,
     enteredCurrency?: DisplayCurrency
 ): void {
@@ -867,7 +916,7 @@ function setPreviewAmount(
     element.textContent = '';
     const satsEl = document.createElement('span');
     satsEl.className = 'preview-sats';
-    satsEl.textContent = `${sats.toLocaleString()} sats`;
+    satsEl.textContent = formatSensitiveSats(sats);
 
     const fiatEl = document.createElement('span');
     fiatEl.className = 'preview-fiat';
@@ -887,6 +936,10 @@ function setPreviewAmount(
 
     const currency = userFiatCurrency;
 
+    if (sats === null) {
+        fiatEl.textContent = 'Fee unavailable';
+        return;
+    }
     satsToFiat(sats, currency)
         .then(fiatAmount => {
             if (fiatAmount === null) {

@@ -749,8 +749,13 @@
             </header>
 
             <main>
-                <div class="withdraw-balance-display">
-                    <p class="withdraw-balance-line">Available Balance: <strong id="withdraw-balance-display" class="withdraw-balance-value">-- sats</strong></p>
+                <div class="withdraw-balance-display send-balance-summary" id="send-balance-summary">
+                    <div class="send-balance-heading">
+                        <span>Spendable balance</span>
+                        <button id="send-balance-privacy-toggle" class="send-balance-privacy-toggle" type="button" aria-label="Hide balance values" aria-pressed="false">◉</button>
+                    </div>
+                    <p class="withdraw-balance-line"><strong id="withdraw-balance-display" class="withdraw-balance-value">-- sats</strong></p>
+                    <p id="send-balance-entry-status" class="send-balance-status">Enter an amount to see what remains.</p>
                 </div>
 
                 <div class="tab-container" id="withdraw-tab-container">
@@ -802,6 +807,11 @@
                         <div class="payment-preview-row payment-preview-total">
                             <span>Total:</span>
                             <strong id="preview-total" class="payment-preview-value amount"></strong>
+                        </div>
+                        <div class="send-balance-preview" id="send-balance-preview">
+                            <div class="payment-preview-row"><span>Spendable:</span><strong id="preview-spendable" class="payment-preview-value"></strong></div>
+                            <div class="payment-preview-row"><span>Remaining:</span><strong id="preview-remaining" class="payment-preview-value"></strong></div>
+                            <p id="preview-balance-status" class="send-balance-status"></p>
                         </div>
                         <div class="payment-preview-row hidden" id="preview-comment-row">
                             <span>Comment:</span>

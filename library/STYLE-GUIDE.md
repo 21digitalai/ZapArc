@@ -82,6 +82,12 @@
 
 `.conversion-hint` — live amount conversion hint below send inputs.
 
+`.send-balance-summary` — compact spendable-balance summary in the send flow.
+
+`.send-balance-heading`, `.send-balance-privacy-toggle`, `.send-balance-status` — summary heading, privacy control, and sufficient/insufficient status; compose `.sufficient` or `.insufficient` on the status.
+
+`.send-balance-preview` — fee-inclusive spendable and remaining balance rows inside the payment preview.
+
 ---
 
 ## Layout
