@@ -436,7 +436,7 @@ export function setupWithdrawalListeners(): void {
     amountInput?.addEventListener('input', () => {
         validateWithdrawalForm();
         updateConversionHint();
-        renderSendBalanceSummary(lastSendBalanceSummary || calculateSendBalanceSummary(currentBalance, 0, null));
+        updateEntryBalanceSummary();
     });
     previewBtn?.addEventListener('click', previewPayment);
 
