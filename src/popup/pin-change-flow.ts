@@ -2,6 +2,7 @@ export type ActiveWallet = { id: string; name: string };
 
 export type PinChangeFlowDependencies = {
     getActiveWallet(): Promise<ActiveWallet | null>;
+    getAuthenticatedSessionPin(): Promise<string | null>;
     promptForPin(message: string): Promise<string | null>;
     rotate(masterKeyId: string, currentPin: string, newPin: string): Promise<{ success: boolean; error?: string }>;
     persistSessionPin(pin: string): Promise<void>;
@@ -16,8 +17,6 @@ export async function runPinChangeFlow(dependencies: PinChangeFlowDependencies):
         return;
     }
 
-    const currentPin = await dependencies.promptForPin(`Enter the current PIN for ${wallet.name}`);
-    if (!currentPin) return;
     const newPin = await dependencies.promptForPin('Enter a new 6-digit PIN');
     if (!newPin) return;
     const confirmation = await dependencies.promptForPin('Confirm the new PIN');
@@ -26,8 +25,19 @@ export async function runPinChangeFlow(dependencies: PinChangeFlowDependencies):
         dependencies.showError('New PINs do not match');
         return;
     }
+    const currentPin = await dependencies.getAuthenticatedSessionPin();
+    if (!currentPin) {
+        dependencies.showError('Unlock the current wallet before changing PIN');
+        return;
+    }
     if (newPin === currentPin) {
         dependencies.showError('New PIN must be different');
+        return;
+    }
+
+    const currentWallet = await dependencies.getActiveWallet();
+    if (!currentWallet || currentWallet.id !== wallet.id) {
+        dependencies.showError('Active wallet changed; try again');
         return;
     }
 

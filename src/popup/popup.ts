@@ -1263,7 +1263,7 @@ function clearSensitiveState(clearSession: boolean = false): void {
 
     if (clearSession) {
         setSessionPin(null);
-        chrome.storage.session.remove('walletSessionPin').catch(() => undefined);
+        chrome.storage.session.remove(['walletSessionPin', 'walletSessionMasterKeyId']).catch(() => undefined);
     }
 }
 
@@ -2143,7 +2143,7 @@ async function handlePinConfirm() {
 
         // Update session PIN to the new wallet's PIN
         setSessionPin(pin);
-        await chrome.storage.session.set({ walletSessionPin: pin });
+        await chrome.storage.session.set({ walletSessionPin: pin, walletSessionMasterKeyId: masterKeyId });
 
         // Set the newly created wallet as the active wallet
         console.log(`[Wizard] Setting newly created wallet ${masterKeyId} as active`);
@@ -2241,7 +2241,7 @@ async function finalizeWalletSetup(): Promise<boolean> {
 
         // Store PIN in session
         setSessionPin(userPin);
-        await chrome.storage.session.set({ walletSessionPin: userPin });
+        await chrome.storage.session.set({ walletSessionPin: userPin, walletSessionMasterKeyId: await getActiveWalletId() });
 
         // Mark as unlocked
         setIsWalletUnlocked(true);
@@ -2663,7 +2663,7 @@ function showUnlockPrompt() {
 
             // Store session PIN
             setSessionPin(pin);
-            await chrome.storage.session.set({ walletSessionPin: pin });
+            await chrome.storage.session.set({ walletSessionPin: pin, walletSessionMasterKeyId: await getActiveWalletId() });
 
             // Update storage
             await chrome.storage.local.set({ isUnlocked: true, lastActivity: Date.now() });
@@ -2974,7 +2974,7 @@ async function handleWalletReset(modal: HTMLElement) {
                 if (walletList) walletList.innerHTML = '';
 
                 // Clear session PIN to force re-unlock
-                await chrome.storage.session.remove(['walletSessionPin']);
+                await chrome.storage.session.remove(['walletSessionPin', 'walletSessionMasterKeyId']);
                 // A previous unlock selection can still point at the wallet
                 // that was just removed. Let the selector derive a valid
                 // choice from the remaining wallet data instead.
@@ -3661,11 +3661,18 @@ async function executeSettingsChangePin(): Promise<void> {
                 const wallet = data?.wallets?.find((entry: any) => entry?.metadata?.id === id);
                 return { id, name: wallet?.metadata?.nickname || 'current wallet' };
             },
+            getAuthenticatedSessionPin: async () => {
+                const sessionData = await chrome.storage.session.get(['walletSessionPin', 'walletSessionMasterKeyId']);
+                const activeWallet = await chrome.storage.local.get(['multiWalletData']);
+                const activeWalletId = activeWallet.multiWalletData ? JSON.parse(activeWallet.multiWalletData)?.activeWalletId : null;
+                if (!activeWalletId || sessionData.walletSessionMasterKeyId !== activeWalletId) return null;
+                return sessionData.walletSessionPin || null;
+            },
             promptForPin: promptForPIN,
             rotate: ExtensionMessaging.changeActiveWalletPin,
             persistSessionPin: async (pin) => {
                 setSessionPin(pin);
-                await chrome.storage.session.set({ walletSessionPin: pin });
+                await chrome.storage.session.set({ walletSessionPin: pin, walletSessionMasterKeyId: await getActiveWalletId() });
             },
             showError,
             showSuccess,
@@ -3829,7 +3836,7 @@ async function initializePopup() {
         }
 
         // Try to auto-reconnect with session PIN
-        const sessionData = await chrome.storage.session.get(['walletSessionPin']);
+        const sessionData = await chrome.storage.session.get(['walletSessionPin', 'walletSessionMasterKeyId']);
         if (sessionData.walletSessionPin) {
             try {
                 console.log('🔐 [Popup] Attempting auto-reconnect...');
@@ -3842,6 +3849,10 @@ async function initializePopup() {
                     setBreezSDK(sdk);
                     setIsWalletUnlocked(true);
                     setSessionPin(sessionData.walletSessionPin);
+                    await chrome.storage.session.set({
+                        walletSessionPin: sessionData.walletSessionPin,
+                        walletSessionMasterKeyId: await getActiveWalletId(),
+                    });
 
                     // Show main interface
                     restoreMainInterface();

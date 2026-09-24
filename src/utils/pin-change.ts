@@ -1,9 +1,6 @@
-export type PinLockout = { locked: boolean; remainingMs?: number };
-
 export type PinChangeStorage = {
-    checkPinLockout(): Promise<PinLockout>;
+    isWalletUnlocked(): Promise<boolean>;
     getMasterKeyMnemonic(masterKeyId: string, pin: string): Promise<string>;
-    recordFailedPin(): Promise<void>;
     resetPinAttempts(): Promise<void>;
     rotateMasterKeyPin(masterKeyId: string, currentPin: string, newPin: string): Promise<void>;
 };
@@ -20,23 +17,18 @@ export async function changeActiveWalletPin(
     masterKeyId: string,
     currentPin: string,
     newPin: string,
-    formatLockoutDuration: (remainingMs: number) => string,
 ): Promise<void> {
     const validationError = pinChangeValidationError(masterKeyId, currentPin, newPin);
     if (validationError) throw new Error(validationError);
 
-    const lockout = await storage.checkPinLockout();
-    if (lockout.locked) throw new Error(`Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`);
+    if (!await storage.isWalletUnlocked()) {
+        throw new Error('Unlock the current wallet before changing PIN');
+    }
 
     try {
         await storage.getMasterKeyMnemonic(masterKeyId, currentPin);
     } catch {
-        await storage.recordFailedPin();
-        const updatedLockout = await storage.checkPinLockout();
-        if (updatedLockout.locked) {
-            throw new Error(`Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`);
-        }
-        throw new Error('Incorrect PIN');
+        throw new Error('Unlock the current wallet before changing PIN');
     }
 
     await storage.rotateMasterKeyPin(masterKeyId, currentPin, newPin);

@@ -40,7 +40,7 @@ Wallet mnemonics are encrypted in `src/utils/storage.ts`.
 - Decrypted mnemonics are normalized and validated with `bip39.validateMnemonic` before use.
 - A failed decrypt is an authentication failure at the caller boundary; never log, return, or cache the mnemonic to diagnose it.
 
-PIN validation belongs at the background message boundary. Current active-wallet PIN changes require exactly six numeric digits, reject reuse of the current PIN, honor `checkPinLockout()`, record failed attempts, and reset attempts only after a successful rotation. Other existing PIN prompts may accept older formats for compatibility; do not silently broaden or narrow those flows without a dedicated approved change.
+PIN validation belongs at the background message boundary. Current active-wallet PIN changes require exactly six numeric digits and reject reuse of the authenticated session PIN. Rotation is allowed only while the exact active master wallet is unlocked: the popup binds `walletSessionPin` to `walletSessionMasterKeyId`, the background rechecks unlocked state, and storage rechecks the active ID under lock. A missing, stale, switched, or invalid session must require unlock without recording a failed PIN attempt. Reset attempts only after a successful rotation. Other existing PIN prompts may accept older formats for compatibility; do not silently broaden or narrow those flows without a dedicated approved change.
 
 Session PIN state is ephemeral popup state. Never persist a plaintext PIN in `chrome.storage.local`, logs, support exports, error payloads, or analytics.
 

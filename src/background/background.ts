@@ -712,7 +712,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'CHANGE_ACTIVE_WALLET_PIN':
         try {
           const { masterKeyId, currentPin, newPin } = message;
-          await changeActiveWalletPin(storageManager, masterKeyId, currentPin, newPin, formatLockoutDuration);
+          await changeActiveWalletPin(storageManager, masterKeyId, currentPin, newPin);
           sendResponse({ success: true });
         } catch (error) {
           sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to change PIN' });
