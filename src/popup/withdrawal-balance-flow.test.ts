@@ -40,7 +40,7 @@ class FakeElement {
 function createFixture(): Record<string, FakeElement> {
     const elements: Record<string, FakeElement> = {};
     [
-        'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total',
+        'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total', 'send-balance-preview',
         'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-total', 'send-balance-result',
         'send-balance-result-label', 'send-balance-summary', 'preview-balance-result-label', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
         'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn'
@@ -110,6 +110,7 @@ describe('withdrawal balance flow', () => {
         expect(elements['send-payment-btn'].disabled).toBe(true);
         expect(elements['preview-balance-result-label'].textContent).toBe('Short by:');
         expect(elements['preview-remaining'].textContent).toBe('25 sats');
+        expect(elements['send-balance-preview'].classList.toggle).toHaveBeenCalledWith('insufficient', true);
         await sendPayment();
         expect(notifications.showError).toHaveBeenCalledWith('Insufficient funds for this payment amount and fee.');
     });

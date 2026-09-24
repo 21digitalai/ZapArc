@@ -51,6 +51,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const entryStatus = document.getElementById('send-balance-entry-status');
     const previewRemaining = document.getElementById('preview-remaining');
     const previewStatus = document.getElementById('preview-balance-status');
+    const previewCard = document.getElementById('send-balance-preview');
     const entryFee = document.getElementById('send-balance-fee');
     const entryTotal = document.getElementById('send-balance-total');
     const entryResult = document.getElementById('send-balance-result');
@@ -81,6 +82,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     });
     const card = document.getElementById('send-balance-summary');
     card?.classList.toggle('insufficient', isInsufficient);
+    previewCard?.classList.toggle('insufficient', isInsufficient);
 }
 
 function updateEntryBalanceSummary(): void {

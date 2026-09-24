@@ -3982,6 +3982,8 @@ body.modal-open {
 .send-balance-status.sufficient { color: var(--success); }
 .send-balance-status.insufficient { color: var(--error); }
 .send-balance-preview { border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; padding-top: 8px; }
+.send-balance-preview.insufficient { border: 1px solid var(--error); border-radius: var(--radius-input); padding: 8px; background: rgba(255, 84, 84, 0.08); }
+.send-balance-preview.insufficient .payment-preview-value { color: var(--error); }
 .payment-preview { padding: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 16px; }
 .payment-preview-title { margin-bottom: 12px; }
 .payment-preview-row { display: flex; justify-content: space-between; margin-bottom: 8px; overflow: hidden; }

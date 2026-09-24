@@ -87,6 +87,7 @@
 `.send-balance-heading`, `.send-balance-privacy-toggle`, `.send-balance-status` — summary heading, privacy control, and sufficient/insufficient status; compose `.sufficient` or `.insufficient` on the status.
 
 `.send-balance-preview` — fee-inclusive spendable and remaining balance rows inside the payment preview.
+  Compose `.insufficient` for the preview's semantic error border/background and shortfall value state.
 
 ---
 
