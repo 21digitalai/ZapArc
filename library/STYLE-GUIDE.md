@@ -123,6 +123,8 @@
 
 `.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
 
+`.send-balance-detail` — compact Send estimate-card row for fee-inclusive total and post-payment result; use within the single `.send-balance-summary` surface and apply its semantic insufficient state rather than creating duplicate balance cards.
+
 ### Transaction diagnostics
 
 `.tx-diagnostics-actions` — transaction-detail diagnostics action group.

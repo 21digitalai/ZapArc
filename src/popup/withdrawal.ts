@@ -52,6 +52,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const previewRemaining = document.getElementById('preview-remaining');
     const previewStatus = document.getElementById('preview-balance-status');
     const entryFee = document.getElementById('send-balance-fee');
+    const entryTotal = document.getElementById('send-balance-total');
     const entryResult = document.getElementById('send-balance-result');
     const entryResultLabel = document.getElementById('send-balance-result-label');
     const previewResultLabel = document.getElementById('preview-balance-result-label');
@@ -60,6 +61,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const resultLabel = isInsufficient ? 'Short by' : 'Remaining after payment';
     const result = isInsufficient ? shortfall : summary.remainingSats;
     if (entryFee) entryFee.textContent = summary.feeSats === null ? 'Calculated at preview' : formatSensitiveSats(summary.feeSats);
+    if (entryTotal) entryTotal.textContent = summary.totalSats === null ? 'Calculated at preview' : formatSensitiveSats(summary.totalSats);
     if (entryResult) entryResult.textContent = formatSensitiveSats(result);
     if (entryResultLabel) entryResultLabel.textContent = resultLabel;
     if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(result);

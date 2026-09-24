@@ -40,7 +40,7 @@ function createFixture(): Record<string, FakeElement> {
     const elements: Record<string, FakeElement> = {};
     [
         'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total',
-        'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-result',
+        'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-total', 'send-balance-result',
         'send-balance-result-label', 'send-balance-summary', 'preview-balance-result-label', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
         'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn'
     ].forEach(id => { elements[id] = new FakeElement(); });
@@ -68,6 +68,7 @@ describe('withdrawal balance flow', () => {
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 2_500, fee: 75, type: 'bolt11' });
 
         expect(elements['preview-remaining'].textContent).toBe('7,425 sats');
+        expect(elements['send-balance-total'].textContent).toBe('2,575 sats');
         expect(elements['preview-total'].children[0].textContent).toBe('2,575 sats');
         expect(elements['send-payment-btn'].disabled).toBe(false);
     });
