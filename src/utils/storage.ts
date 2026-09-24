@@ -1048,6 +1048,7 @@ export class ChromeStorageManager {
         // If removing active wallet, switch to first remaining wallet
         if (multiWalletData.activeWalletId === id) {
           multiWalletData.activeWalletId = multiWalletData.wallets[0].metadata.id;
+          multiWalletData.activeSubWalletIndex = 0;
           multiWalletData.wallets[0].metadata.lastUsedAt = Date.now();
           console.log('⚠️ [Storage] Removed active wallet, switched to', {
             newActiveId: multiWalletData.activeWalletId
