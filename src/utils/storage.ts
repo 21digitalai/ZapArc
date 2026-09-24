@@ -1807,7 +1807,15 @@ export class ChromeStorageManager {
       const result = await chrome.storage.local.get(['multiWalletData']);
       if (!result.multiWalletData) throw new Error('No wallet data found');
 
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      let data: MultiWalletStorage;
+      try {
+        data = JSON.parse(result.multiWalletData);
+      } catch {
+        throw new Error('This wallet format cannot safely change PIN; use recovery');
+      }
+      if (!Array.isArray(data.wallets) || typeof data.activeWalletId !== 'string') {
+        throw new Error('This wallet format cannot safely change PIN; use recovery');
+      }
       if (data.activeWalletId !== masterKeyId) throw new Error('Active wallet changed; try again');
 
       const wallet = data.wallets.find(entry => entry.metadata.id === masterKeyId);

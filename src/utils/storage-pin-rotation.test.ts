@@ -5,16 +5,21 @@ import { ChromeStorageManager } from './storage';
 type Wallet = { metadata: { id: string }; encryptedMnemonic: string; subWallets?: Array<{ index: number }> };
 type StorageData = { activeWalletId: string; activeSubWalletIndex: number; wallets: Wallet[]; walletOrder: string[]; version: number };
 
-function makeStorage(data: StorageData, failPersistedRead = false) {
+function makeStorage(data: StorageData, failPersistedRead = false, failFirstWrite = false) {
     let stored = JSON.stringify(data);
     let reads = 0;
+    let writes = 0;
     (globalThis as any).chrome = {
         storage: { local: {
             get: async () => {
                 reads += 1;
                 return { multiWalletData: failPersistedRead && reads > 1 ? JSON.stringify({ ...data, wallets: [] }) : stored };
             },
-            set: async (value: { multiWalletData: string }) => { stored = value.multiWalletData; },
+            set: async (value: { multiWalletData: string }) => {
+                writes += 1;
+                if (failFirstWrite && writes === 1) throw new Error('Storage quota exceeded');
+                stored = value.multiWalletData;
+            },
         } },
     };
     const manager = Object.create(ChromeStorageManager.prototype) as ChromeStorageManager;
@@ -60,6 +65,17 @@ describe('rotateMasterKeyPin', () => {
         expect(fixture.value().wallets[0].encryptedMnemonic).toBe('111111:seed');
     });
 
+    it('restores the original ciphertext after a failed storage write', async () => {
+        const data: StorageData = {
+            version: 1, activeWalletId: 'active', activeSubWalletIndex: 0, walletOrder: ['active'],
+            wallets: [{ metadata: { id: 'active' }, encryptedMnemonic: '111111:seed' }],
+        };
+        const fixture = makeStorage(data, false, true);
+
+        await expect(fixture.manager.rotateMasterKeyPin('active', '111111', '222222')).rejects.toThrow('Storage quota exceeded');
+        expect(fixture.value().wallets[0].encryptedMnemonic).toBe('111111:seed');
+    });
+
     it('rejects a stale active-wallet target without mutating either wallet', async () => {
         const data: StorageData = {
             version: 1, activeWalletId: 'other', activeSubWalletIndex: 0, walletOrder: ['active', 'other'],
@@ -69,6 +85,18 @@ describe('rotateMasterKeyPin', () => {
 
         await expect(fixture.manager.rotateMasterKeyPin('active', '111111', '222222')).rejects.toThrow('Active wallet changed');
         expect(fixture.value().wallets.map(wallet => wallet.encryptedMnemonic)).toEqual(['111111:seed', '333333:other']);
+    });
+
+    it('leaves a legacy storage payload untouched with a recovery-safe error', async () => {
+        const set = async () => { throw new Error('legacy storage must not be written'); };
+        (globalThis as any).chrome = { storage: { local: {
+            get: async () => ({ multiWalletData: 'legacy-wallet-format' }),
+            set,
+        } } };
+        const manager = Object.create(ChromeStorageManager.prototype) as ChromeStorageManager;
+        (manager as any).withStorageLock = async (operation: () => Promise<void>) => operation();
+
+        await expect(manager.rotateMasterKeyPin('active', '111111', '222222')).rejects.toThrow('cannot safely change PIN');
     });
 });
 

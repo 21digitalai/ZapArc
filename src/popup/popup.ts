@@ -57,6 +57,8 @@ import {
 
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
+import { runPinChangeFlow } from './pin-change-flow';
+import { createSingleFlight } from '../utils/single-flight';
 
 // Utility imports
 import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
@@ -3646,50 +3648,39 @@ async function handleSettingsViewRecoveryPhrase(): Promise<void> {
     }
 }
 
-let settingsPinChangeInProgress = false;
-
-async function handleSettingsChangePin(): Promise<void> {
-    if (settingsPinChangeInProgress) return;
-    settingsPinChangeInProgress = true;
+async function executeSettingsChangePin(): Promise<void> {
     const button = document.getElementById('settings-change-pin-btn') as HTMLButtonElement | null;
     if (button) button.disabled = true;
     try {
-        const result = await chrome.storage.local.get(['multiWalletData']);
-        const data = result.multiWalletData ? JSON.parse(result.multiWalletData) : null;
-        const masterKeyId = data?.activeWalletId;
-        const walletName = data?.wallets?.find((wallet: any) => wallet?.metadata?.id === masterKeyId)?.metadata?.nickname || 'current wallet';
-        if (!masterKeyId) {
-            showError('No active wallet found');
-            return;
-        }
-        const currentPin = await promptForPIN(`Enter the current PIN for ${walletName}`);
-        if (!currentPin) return;
-        const newPin = await promptForPIN('Enter a new 6-digit PIN');
-        if (!newPin) return;
-        const confirmation = await promptForPIN('Confirm the new PIN');
-        if (!confirmation) return;
-        if (newPin !== confirmation) {
-            showError('New PINs do not match');
-            return;
-        }
-        if (newPin === currentPin) {
-            showError('New PIN must be different');
-            return;
-        }
-        const response = await ExtensionMessaging.changeActiveWalletPin(masterKeyId, currentPin, newPin);
-        if (!response.success) {
-            showError(response.error || 'Failed to change PIN');
-            return;
-        }
-        setSessionPin(newPin);
-        await chrome.storage.session.set({ walletSessionPin: newPin });
-        showSuccess('PIN changed for the current wallet');
+        await runPinChangeFlow({
+            getActiveWallet: async () => {
+                const result = await chrome.storage.local.get(['multiWalletData']);
+                const data = result.multiWalletData ? JSON.parse(result.multiWalletData) : null;
+                const id = data?.activeWalletId;
+                if (!id) return null;
+                const wallet = data?.wallets?.find((entry: any) => entry?.metadata?.id === id);
+                return { id, name: wallet?.metadata?.nickname || 'current wallet' };
+            },
+            promptForPin: promptForPIN,
+            rotate: ExtensionMessaging.changeActiveWalletPin,
+            persistSessionPin: async (pin) => {
+                setSessionPin(pin);
+                await chrome.storage.session.set({ walletSessionPin: pin });
+            },
+            showError,
+            showSuccess,
+        });
     } catch (error) {
         showError(error instanceof Error ? error.message : 'Failed to change PIN');
     } finally {
-        settingsPinChangeInProgress = false;
         if (button) button.disabled = false;
     }
+}
+
+const runSettingsPinChange = createSingleFlight(executeSettingsChangePin);
+
+async function handleSettingsChangePin(): Promise<void> {
+    await runSettingsPinChange();
 }
 
 function showSeedPhraseModal(mnemonic: string, walletName: string): void {

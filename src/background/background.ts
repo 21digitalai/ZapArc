@@ -5,6 +5,7 @@ import { WalletData, UserSettings } from '../types';
 import { WalletManager } from '../utils/wallet-manager';
 import { ChromeStorageManager } from '../utils/storage';
 import { LnurlManager, convertToLnurl } from '../utils/lnurl';
+import { changeActiveWalletPin } from '../utils/pin-change';
 import * as bip39 from 'bip39';
 
 // Breez SDK API key (client certificate for Spark implementation)
@@ -711,23 +712,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'CHANGE_ACTIVE_WALLET_PIN':
         try {
           const { masterKeyId, currentPin, newPin } = message;
-          if (!masterKeyId || typeof masterKeyId !== 'string') throw new Error('Active wallet is required');
-          if (!/^\d{6}$/.test(currentPin) || !/^\d{6}$/.test(newPin)) throw new Error('PIN must contain exactly 6 digits');
-          if (currentPin === newPin) throw new Error('New PIN must be different');
-
-          const lockout = await storageManager.checkPinLockout();
-          if (lockout.locked) throw new Error(`Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`);
-          try {
-            await storageManager.getMasterKeyMnemonic(masterKeyId, currentPin);
-          } catch (error) {
-            await storageManager.recordFailedPin();
-            const updatedLockout = await storageManager.checkPinLockout();
-            throw new Error(updatedLockout.locked
-              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
-              : 'Incorrect PIN');
-          }
-          await storageManager.rotateMasterKeyPin(masterKeyId, currentPin, newPin);
-          await storageManager.resetPinAttempts();
+          await changeActiveWalletPin(storageManager, masterKeyId, currentPin, newPin, formatLockoutDuration);
           sendResponse({ success: true });
         } catch (error) {
           sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to change PIN' });
