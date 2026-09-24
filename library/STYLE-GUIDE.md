@@ -121,6 +121,8 @@
 
 `.settings-action-btn` with `.lightning-address-section` — settings disclosure pattern. Invoice expiry uses this existing disclosure with native select/input controls, clear labels, and inline validation.
 
+`.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
+
 ### Transaction diagnostics
 
 `.tx-diagnostics-actions` — transaction-detail diagnostics action group.

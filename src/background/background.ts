@@ -708,6 +708,29 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      case 'CHANGE_ACTIVE_WALLET_PIN':
+        try {
+          const { masterKeyId, currentPin, newPin } = message;
+          if (!masterKeyId || typeof masterKeyId !== 'string') throw new Error('Active wallet is required');
+          if (!/^\d{6}$/.test(currentPin) || !/^\d{6}$/.test(newPin)) throw new Error('PIN must contain exactly 6 digits');
+          if (currentPin === newPin) throw new Error('New PIN must be different');
+
+          const lockout = await storageManager.checkPinLockout();
+          if (lockout.locked) throw new Error(`Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`);
+          try {
+            await storageManager.getMasterKeyMnemonic(masterKeyId, currentPin);
+          } catch (error) {
+            await storageManager.recordFailedPin();
+            throw new Error('Incorrect PIN');
+          }
+          await storageManager.rotateMasterKeyPin(masterKeyId, currentPin, newPin);
+          await storageManager.resetPinAttempts();
+          sendResponse({ success: true });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to change PIN' });
+        }
+        break;
+
       case 'CHECK_DUPLICATE_MNEMONIC':
         try {
           console.log('[Background] CHECK_DUPLICATE_MNEMONIC - Checking for duplicate');

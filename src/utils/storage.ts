@@ -1796,6 +1796,50 @@ export class ChromeStorageManager {
   }
 
   /**
+   * Replace the encryption PIN for one active master key without changing any
+   * wallet identity or its derived sub-wallet definitions.  The replacement is
+   * verified before it becomes durable, while the storage lock prevents a
+   * concurrent wallet switch or second submit from changing the target.
+   */
+  async rotateMasterKeyPin(masterKeyId: string, currentPin: string, newPin: string): Promise<void> {
+    await this.withStorageLock(async () => {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+      if (!result.multiWalletData) throw new Error('No wallet data found');
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      if (data.activeWalletId !== masterKeyId) throw new Error('Active wallet changed; try again');
+
+      const wallet = data.wallets.find(entry => entry.metadata.id === masterKeyId);
+      if (!wallet) throw new Error('Active wallet is unavailable');
+
+      const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, currentPin);
+      const replacement = await this.encryptMnemonic(mnemonic, newPin);
+      const verifiedMnemonic = await this.decryptMnemonic(replacement, newPin);
+      if (this.normalizeMnemonicForComparison(mnemonic) !== this.normalizeMnemonicForComparison(verifiedMnemonic)) {
+        throw new Error('PIN change verification failed');
+      }
+
+      const original = wallet.encryptedMnemonic;
+      wallet.encryptedMnemonic = replacement;
+      try {
+        await chrome.storage.local.set({ multiWalletData: JSON.stringify(data) });
+        const persisted = await chrome.storage.local.get(['multiWalletData']);
+        const persistedData: MultiWalletStorage = JSON.parse(persisted.multiWalletData);
+        const persistedWallet = persistedData.wallets.find(entry => entry.metadata.id === masterKeyId);
+        if (!persistedWallet || persistedData.activeWalletId !== masterKeyId) throw new Error('PIN change verification failed');
+        const persistedMnemonic = await this.decryptMnemonic(persistedWallet.encryptedMnemonic, newPin);
+        if (this.normalizeMnemonicForComparison(mnemonic) !== this.normalizeMnemonicForComparison(persistedMnemonic)) {
+          throw new Error('PIN change verification failed');
+        }
+      } catch (error) {
+        wallet.encryptedMnemonic = original;
+        await chrome.storage.local.set({ multiWalletData: JSON.stringify(data) });
+        throw error;
+      }
+    });
+  }
+
+  /**
    * Try to unlock any wallet with the given PIN
    * Returns the first wallet that successfully decrypts
    */

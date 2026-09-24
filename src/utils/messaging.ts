@@ -669,6 +669,10 @@ export class ExtensionMessaging {
     });
   }
 
+  static async changeActiveWalletPin(masterKeyId: string, currentPin: string, newPin: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({ type: 'CHANGE_ACTIVE_WALLET_PIN', masterKeyId, currentPin, newPin });
+  }
+
   /**
    * Check if mnemonic already exists (duplicate detection)
    * Derives fingerprint from mnemonic and compares with existing wallets
