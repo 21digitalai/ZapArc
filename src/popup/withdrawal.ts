@@ -39,6 +39,7 @@ let userFiatCurrency: FiatCurrency = 'usd';
 const SEND_INPUT_CURRENCY_KEY = 'send_input_currency';
 let sendBalancesHidden = false;
 let lastSendBalanceSummary: SendBalanceSummary | null = null;
+let activePaymentPreview: any | null = null;
 
 function formatSensitiveSats(sats: number | null): string {
     if (sendBalancesHidden) return '••••••';
@@ -73,6 +74,17 @@ function updateEntryBalanceSummary(): void {
     const input = document.getElementById('withdrawal-amount') as HTMLInputElement | null;
     const amount = input ? Number(input.value) : 0;
     renderSendBalanceSummary(calculateSendBalanceSummary(currentBalance, amount, null));
+}
+
+function getPaymentPreviewSummary(previewData: any): SendBalanceSummary {
+    const fee = typeof previewData.fee === 'number' && Number.isFinite(previewData.fee)
+        ? previewData.fee
+        : null;
+    return calculateSendBalanceSummary(currentBalance, previewData.amount, fee);
+}
+
+function rerenderActivePaymentPreview(): void {
+    if (activePaymentPreview) displayPaymentPreview(activePaymentPreview, false);
 }
 
 /** Load the user's fiat unit plus Send's independent amount-input preference. */
@@ -345,6 +357,7 @@ export function resetWithdrawForm(): void {
     }
     if (commentInput) commentInput.value = '';
     preparedCommentAtPreview = undefined;
+    activePaymentPreview = null;
     previewDiv?.classList.add('hidden');
     hideSaveContactPrompt();
     dismissedSaveContactAddress = null;
@@ -464,6 +477,7 @@ export function setupWithdrawalListeners(): void {
         privacyToggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
         privacyToggle.setAttribute('aria-pressed', String(sendBalancesHidden));
         updateEntryBalanceSummary();
+        rerenderActivePaymentPreview();
     });
 
     const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
@@ -868,7 +882,8 @@ export async function previewPayment(): Promise<void> {
     }
 }
 
-export function displayPaymentPreview(previewData: any): void {
+export function displayPaymentPreview(previewData: any, saveActivePreview = true): void {
+    if (saveActivePreview) activePaymentPreview = previewData;
     const previewDiv = document.getElementById('payment-preview');
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
     if (!previewDiv || !sendBtn) return;
@@ -881,11 +896,10 @@ export function displayPaymentPreview(previewData: any): void {
     const commentEl = document.getElementById('preview-comment');
 
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
-    const fee = typeof previewData.fee === 'number' && Number.isFinite(previewData.fee) ? previewData.fee : null;
-    const summary = calculateSendBalanceSummary(currentBalance, previewData.amount, fee);
+    const summary = getPaymentPreviewSummary(previewData);
     const total = summary.totalSats;
     setPreviewAmount(amountEl, previewData.amount, previewData.enteredAmount, previewData.enteredCurrency);
-    setPreviewAmount(feeEl, fee);
+    setPreviewAmount(feeEl, summary.feeSats);
     setPreviewAmount(totalEl, total);
     renderSendBalanceSummary(summary);
     const comment = nonblankPaymentComment((document.getElementById('withdrawal-comment') as HTMLInputElement | null)?.value) || '';
@@ -920,7 +934,7 @@ function setPreviewAmount(
 
     const fiatEl = document.createElement('span');
     fiatEl.className = 'preview-fiat';
-    fiatEl.textContent = '≈ ...';
+    fiatEl.textContent = sendBalancesHidden ? '••••••' : '≈ ...';
 
     element.append(satsEl, fiatEl);
 
@@ -930,9 +944,11 @@ function setPreviewAmount(
     if (selectedAmount) {
         const selectedEl = document.createElement('span');
         selectedEl.className = 'preview-fiat preview-selected-currency';
-        selectedEl.textContent = selectedAmount;
+        selectedEl.textContent = sendBalancesHidden ? '••••••' : selectedAmount;
         element.append(selectedEl);
     }
+
+    if (sendBalancesHidden) return;
 
     const currency = userFiatCurrency;
 
@@ -961,6 +977,12 @@ export async function sendPayment(): Promise<void> {
 
     if (!paymentInput || !sendBtn) return;
     if (paymentSendInProgress) return;
+
+    const preparedSummary = activePaymentPreview ? getPaymentPreviewSummary(activePaymentPreview) : null;
+    if (!preparedSummary || preparedSummary.hasSufficientFunds !== true) {
+        showError('Insufficient funds for this payment amount and fee.');
+        return;
+    }
 
     const confirmed = await showConfirmDialog('Confirm Payment', 'Are you sure you want to send this payment? This action cannot be undone.');
     if (!confirmed) return;

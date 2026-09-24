@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadPaymentComment, renderTransactionCommentDetailRow } from './payment-comment';
 
-const state = vi.hoisted(() => ({ sdk: null as any, preparedPayment: null as any }));
+const state = vi.hoisted(() => ({ sdk: null as any, preparedPayment: null as any, balance: 10_000 }));
 
 vi.mock('./state', () => ({
     get breezSDK() { return state.sdk; },
     get preparedPayment() { return state.preparedPayment; },
-    currentBalance: 0,
+    get currentBalance() { return state.balance; },
     setPreparedPayment: vi.fn((payment: any) => { state.preparedPayment = payment; })
 }));
 vi.mock('./contacts', () => ({ isExistingContact: vi.fn(), openContactModalWithAddress: vi.fn(), openContactPicker: vi.fn(), showContactsInterface: vi.fn() }));
-vi.mock('./notifications', () => ({ showError: vi.fn(), showSuccess: vi.fn(), showConfirmDialog: vi.fn(async () => true) }));
+const notificationState = vi.hoisted(() => ({ showError: vi.fn() }));
+vi.mock('./notifications', () => ({ showError: notificationState.showError, showSuccess: vi.fn(), showConfirmDialog: vi.fn(async () => true) }));
 vi.mock('../utils/currency', () => ({ currencyService: {}, fiatToSats: vi.fn(), satsToFiat: vi.fn(), formatFiat: vi.fn(), formatSelectedCurrencyAmount: vi.fn(), getBtcSpotPrice: vi.fn() }));
 vi.mock('./currency-pref', () => ({ getUserFiatCurrency: vi.fn(), getDisplayCurrency: vi.fn(), persistDisplayCurrency: vi.fn() }));
 
@@ -20,14 +21,15 @@ type TestElement = {
     disabled: boolean;
     placeholder: string;
     className: string;
-    classList: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+    classList: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn>; toggle: ReturnType<typeof vi.fn> };
+    append: (...children: TestElement[]) => void;
     removeAttribute: ReturnType<typeof vi.fn>;
 };
 
 function element(value = ''): TestElement {
     return {
         value, textContent: '', disabled: false, placeholder: '', className: '',
-        classList: { add: vi.fn(), remove: vi.fn() }, removeAttribute: vi.fn()
+        classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() }, append: vi.fn(), removeAttribute: vi.fn()
     };
 }
 
@@ -36,6 +38,8 @@ describe('withdrawal comment flow', () => {
         vi.resetModules();
         state.sdk = null;
         state.preparedPayment = null;
+        state.balance = 10_000;
+        notificationState.showError.mockReset();
         vi.stubGlobal('setTimeout', vi.fn());
     });
 
@@ -54,6 +58,7 @@ describe('withdrawal comment flow', () => {
         };
         vi.stubGlobal('document', {
             getElementById: (id: string) => elements[id] || null,
+            createElement: () => element(),
             querySelectorAll: () => []
         });
         vi.stubGlobal('chrome', {
@@ -73,6 +78,8 @@ describe('withdrawal comment flow', () => {
         await previewPayment();
         elements['withdrawal-comment'].value = 'later composer edit';
         await sendPayment();
+
+        expect(notificationState.showError).not.toHaveBeenCalled();
 
         const persisted = await loadPaymentComment('wallet-a', 2, 'completed-payment');
         const detailHtml = renderTransactionCommentDetailRow('Provider description', persisted, value => value);
@@ -94,6 +101,7 @@ describe('withdrawal comment flow', () => {
         };
         vi.stubGlobal('document', {
             getElementById: (id: string) => elements[id] || null,
+            createElement: () => element(),
             querySelectorAll: () => []
         });
 
