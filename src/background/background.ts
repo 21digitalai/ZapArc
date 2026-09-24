@@ -721,7 +721,10 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
             await storageManager.getMasterKeyMnemonic(masterKeyId, currentPin);
           } catch (error) {
             await storageManager.recordFailedPin();
-            throw new Error('Incorrect PIN');
+            const updatedLockout = await storageManager.checkPinLockout();
+            throw new Error(updatedLockout.locked
+              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+              : 'Incorrect PIN');
           }
           await storageManager.rotateMasterKeyPin(masterKeyId, currentPin, newPin);
           await storageManager.resetPinAttempts();
