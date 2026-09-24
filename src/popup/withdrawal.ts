@@ -56,7 +56,8 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const entryResult = document.getElementById('send-balance-result');
     const entryResultLabel = document.getElementById('send-balance-result-label');
     const previewResultLabel = document.getElementById('preview-balance-result-label');
-    const shortfall = summary.totalSats === null ? null : Math.max(0, summary.totalSats - summary.spendableSats);
+    const minimumRequiredSats = summary.totalSats === null ? summary.amountSats : summary.totalSats;
+    const shortfall = Math.max(0, minimumRequiredSats - summary.spendableSats);
     const isInsufficient = shortfall !== null && shortfall > 0;
     const resultLabel = isInsufficient ? 'Short by' : 'Remaining after payment';
     const result = isInsufficient ? shortfall : summary.remainingSats;

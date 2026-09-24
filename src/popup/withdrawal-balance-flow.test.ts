@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 const state = vi.hoisted(() => ({ balance: 10_000, preparedPayment: { paymentMethod: {} } as any }));
 const notifications = vi.hoisted(() => ({ showError: vi.fn(), showConfirmDialog: vi.fn(async () => true) }));
@@ -111,5 +112,52 @@ describe('withdrawal balance flow', () => {
         expect(elements['preview-remaining'].textContent).toBe('25 sats');
         await sendPayment();
         expect(notifications.showError).toHaveBeenCalledWith('Insufficient funds for this payment amount and fee.');
+    });
+
+    it('shows an explicit shortfall when the entered amount alone exceeds the balance before a fee is known', async () => {
+        const elements = createFixture();
+        elements['withdrawal-amount'].value = '10001';
+        vi.stubGlobal('document', {
+            getElementById: (id: string) => elements[id] || null,
+            createElement: () => new FakeElement(),
+            querySelectorAll: () => []
+        });
+        const { setupWithdrawalListeners } = await import('./withdrawal');
+        setupWithdrawalListeners();
+        elements['withdrawal-amount'].click();
+        const inputListener = elements['withdrawal-amount'].listeners.get('input')?.[0];
+        inputListener?.();
+
+        expect(elements['send-balance-entry-status'].textContent).toContain('Insufficient balance');
+        expect(elements['send-balance-result-label'].textContent).toBe('Short by');
+        expect(elements['send-balance-result'].textContent).toBe('1 sats');
+    });
+
+    it('keeps every known fee, total, and shortfall value masked in the unified card', async () => {
+        const elements = createFixture();
+        vi.stubGlobal('document', {
+            getElementById: (id: string) => elements[id] || null,
+            createElement: () => new FakeElement(),
+            querySelectorAll: () => []
+        });
+        const { displayPaymentPreview, setupWithdrawalListeners } = await import('./withdrawal');
+        setupWithdrawalListeners();
+        displayPaymentPreview({ recipient: 'Lightning Payment', amount: 9_950, fee: 75, type: 'bolt11' });
+        elements['send-balance-privacy-toggle'].click();
+
+        expect(elements['send-balance-fee'].textContent).toBe('••••••');
+        expect(elements['send-balance-total'].textContent).toBe('••••••');
+        expect(elements['send-balance-result'].textContent).toBe('••••••');
+        expect(elements['preview-remaining'].textContent).toBe('••••••');
+    });
+
+    it('uses exactly one lower estimate card with conversion, fee, total, and result rows', () => {
+        const html = readFileSync(new URL('./popup.html', import.meta.url), 'utf8');
+        expect((html.match(/id="send-balance-summary"/g) || [])).toHaveLength(1);
+        expect(html).toContain('id="send-conversion-hint"');
+        expect(html).toContain('id="send-balance-fee"');
+        expect(html).toContain('id="send-balance-total"');
+        expect(html).toContain('id="send-balance-result"');
+        expect(html).not.toContain('Spendable balance');
     });
 });

@@ -24,4 +24,17 @@ describe('calculateSendBalanceSummary', () => {
             hasSufficientFunds: null
         });
     });
+
+    it('accepts an exact fee-inclusive balance and rejects a one-sat shortfall', () => {
+        expect(calculateSendBalanceSummary(1_000, 950, 50)).toMatchObject({ remainingSats: 0, hasSufficientFunds: true });
+        expect(calculateSendBalanceSummary(1_000, 950, 51)).toMatchObject({ remainingSats: -1, hasSufficientFunds: false });
+    });
+
+    it('flags an amount that already exceeds the balance before an unknown fee is calculated', () => {
+        expect(calculateSendBalanceSummary(1_000, 1_001, undefined)).toMatchObject({
+            totalSats: null,
+            remainingSats: null,
+            hasSufficientFunds: false,
+        });
+    });
 });

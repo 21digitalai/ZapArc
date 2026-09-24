@@ -25,6 +25,8 @@ export function calculateSendBalanceSummary(
         feeSats: knownFee,
         totalSats,
         remainingSats: totalSats === null ? null : safeBalance - totalSats,
-        hasSufficientFunds: totalSats === null ? null : safeBalance >= totalSats
+        hasSufficientFunds: totalSats === null
+            ? (safeAmount > safeBalance ? false : null)
+            : safeBalance >= totalSats
     };
 }
