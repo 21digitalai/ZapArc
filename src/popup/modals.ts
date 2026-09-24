@@ -73,6 +73,15 @@ export function hideAllModals(): void {
 }
 
 export function closeCurrentModal(value: any): void {
+    if (modalState.currentModal === 'pin-modal') {
+        const input = document.getElementById('pin-modal-input') as HTMLInputElement | null;
+        const error = document.getElementById('pin-modal-error');
+        if (input) input.value = '';
+        if (error) {
+            error.textContent = '';
+            error.classList.add('hidden');
+        }
+    }
     if (modalState.resolveCallback) {
         modalState.resolveCallback(value);
         modalState.resolveCallback = null;

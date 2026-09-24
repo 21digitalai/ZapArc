@@ -38,7 +38,7 @@ class FakeButton {
     click(): void { (this.listeners.get('click') || []).forEach(listener => listener({ target: null as any })); }
 }
 
-function createModalDocument(): { document: any; input: () => FakeInput; confirm: () => FakeButton; error: any } {
+function createModalDocument(): { document: any; input: () => FakeInput; confirm: () => FakeButton; cancel: () => FakeButton; error: any } {
     let currentInput: FakeInput;
     let currentConfirm: FakeButton;
     let currentCancel: FakeButton;
@@ -64,6 +64,7 @@ function createModalDocument(): { document: any; input: () => FakeInput; confirm
         },
         input: () => currentInput,
         confirm: () => currentConfirm,
+        cancel: () => currentCancel,
         error,
     };
 }
@@ -101,5 +102,35 @@ describe('wallet name prompts', () => {
         fixture.confirm().click();
 
         expect(fixture.error.textContent).toBe('Please enter a value');
+    });
+});
+
+describe('PIN modal sensitive state', () => {
+    const originalDocument = globalThis.document;
+
+    afterEach(() => Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument }));
+
+    it('clears the entered PIN and error state after confirmation', async () => {
+        const fixture = createModalDocument();
+        Object.defineProperty(globalThis, 'document', { configurable: true, value: fixture.document });
+        const prompt = showPINModal('PIN');
+        fixture.input().value = '123456';
+        fixture.error.textContent = 'stale error';
+        fixture.confirm().click();
+        await expect(prompt).resolves.toBe('123456');
+        expect(fixture.input().value).toBe('');
+        expect(fixture.error.textContent).toBe('');
+    });
+
+    it('clears the entered PIN and error state after cancellation', async () => {
+        const fixture = createModalDocument();
+        Object.defineProperty(globalThis, 'document', { configurable: true, value: fixture.document });
+        const prompt = showPINModal('PIN');
+        fixture.input().value = '123456';
+        fixture.error.textContent = 'stale error';
+        fixture.cancel().click();
+        await expect(prompt).resolves.toBeNull();
+        expect(fixture.input().value).toBe('');
+        expect(fixture.error.textContent).toBe('');
     });
 });
