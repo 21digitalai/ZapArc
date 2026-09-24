@@ -48,17 +48,25 @@ function formatSensitiveSats(sats: number | null): string {
 
 function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     lastSendBalanceSummary = summary;
-    const spendable = document.getElementById('withdraw-balance-display');
     const entryStatus = document.getElementById('send-balance-entry-status');
-    const previewSpendable = document.getElementById('preview-spendable');
     const previewRemaining = document.getElementById('preview-remaining');
     const previewStatus = document.getElementById('preview-balance-status');
-    if (spendable) spendable.textContent = formatSensitiveSats(summary.spendableSats);
-    if (previewSpendable) previewSpendable.textContent = formatSensitiveSats(summary.spendableSats);
-    if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(summary.remainingSats);
+    const entryFee = document.getElementById('send-balance-fee');
+    const entryResult = document.getElementById('send-balance-result');
+    const entryResultLabel = document.getElementById('send-balance-result-label');
+    const previewResultLabel = document.getElementById('preview-balance-result-label');
+    const shortfall = summary.totalSats === null ? null : Math.max(0, summary.totalSats - summary.spendableSats);
+    const isInsufficient = shortfall !== null && shortfall > 0;
+    const resultLabel = isInsufficient ? 'Short by' : 'Remaining after payment';
+    const result = isInsufficient ? shortfall : summary.remainingSats;
+    if (entryFee) entryFee.textContent = summary.feeSats === null ? 'Calculated at preview' : formatSensitiveSats(summary.feeSats);
+    if (entryResult) entryResult.textContent = formatSensitiveSats(result);
+    if (entryResultLabel) entryResultLabel.textContent = resultLabel;
+    if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(result);
+    if (previewResultLabel) previewResultLabel.textContent = isInsufficient ? 'Short by:' : 'Remaining:';
 
     const status = summary.hasSufficientFunds === false
-        ? 'Insufficient funds for amount and fee.'
+        ? 'Insufficient balance — payment amount and fee are not covered.'
         : summary.hasSufficientFunds === true
             ? 'Sufficient funds for amount and fee.'
             : 'Fee unavailable — remaining balance cannot be calculated yet.';
@@ -68,6 +76,8 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
         element.classList.toggle('insufficient', summary.hasSufficientFunds === false);
         element.classList.toggle('sufficient', summary.hasSufficientFunds === true);
     });
+    const card = document.getElementById('send-balance-summary');
+    card?.classList.toggle('insufficient', isInsufficient);
 }
 
 function updateEntryBalanceSummary(): void {

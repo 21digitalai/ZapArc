@@ -40,8 +40,8 @@ function createFixture(): Record<string, FakeElement> {
     const elements: Record<string, FakeElement> = {};
     [
         'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total',
-        'preview-comment-row', 'preview-comment', 'withdraw-balance-display', 'send-balance-entry-status',
-        'preview-spendable', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
+        'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-result',
+        'send-balance-result-label', 'send-balance-summary', 'preview-balance-result-label', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
         'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn'
     ].forEach(id => { elements[id] = new FakeElement(); });
     elements['payment-input'].value = 'lnbc1invoice';
@@ -67,7 +67,6 @@ describe('withdrawal balance flow', () => {
 
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 2_500, fee: 75, type: 'bolt11' });
 
-        expect(elements['preview-spendable'].textContent).toBe('10,000 sats');
         expect(elements['preview-remaining'].textContent).toBe('7,425 sats');
         expect(elements['preview-total'].children[0].textContent).toBe('2,575 sats');
         expect(elements['send-payment-btn'].disabled).toBe(false);
@@ -85,8 +84,6 @@ describe('withdrawal balance flow', () => {
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 2_500, fee: 75, type: 'bolt11' });
 
         elements['send-balance-privacy-toggle'].click();
-        expect(elements['withdraw-balance-display'].textContent).toBe('••••••');
-        expect(elements['preview-spendable'].textContent).toBe('••••••');
         expect(elements['preview-remaining'].textContent).toBe('••••••');
         expect(elements['preview-fee'].children[0].textContent).toBe('••••••');
 
@@ -109,6 +106,8 @@ describe('withdrawal balance flow', () => {
 
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 9_950, fee: 75, type: 'bolt11' });
         expect(elements['send-payment-btn'].disabled).toBe(true);
+        expect(elements['preview-balance-result-label'].textContent).toBe('Short by:');
+        expect(elements['preview-remaining'].textContent).toBe('25 sats');
         await sendPayment();
         expect(notifications.showError).toHaveBeenCalledWith('Insufficient funds for this payment amount and fee.');
     });

@@ -750,15 +750,6 @@
             </header>
 
             <main>
-                <div class="withdraw-balance-display send-balance-summary" id="send-balance-summary">
-                    <div class="send-balance-heading">
-                        <span>Spendable balance</span>
-                        <button id="send-balance-privacy-toggle" class="send-balance-privacy-toggle" type="button" aria-label="Hide balance values" aria-pressed="false">◉</button>
-                    </div>
-                    <p class="withdraw-balance-line"><strong id="withdraw-balance-display" class="withdraw-balance-value">-- sats</strong></p>
-                    <p id="send-balance-entry-status" class="send-balance-status">Enter an amount to see what remains.</p>
-                </div>
-
                 <div class="tab-container" id="withdraw-tab-container">
                     <button id="withdraw-tab-lightning" class="tab-btn active" type="button">⚡ Lightning</button>
                     <button id="withdraw-tab-onchain" class="tab-btn" type="button">₿ On-chain</button>
@@ -783,7 +774,16 @@
                                 <option value="eur">EUR (€)</option>
                             </select>
                         </div>
-                        <div id="send-conversion-hint" class="conversion-hint hidden"></div>
+                        <div class="send-balance-summary" id="send-balance-summary">
+                            <div class="send-balance-heading">
+                                <span>Payment estimate</span>
+                                <button id="send-balance-privacy-toggle" class="send-balance-privacy-toggle" type="button" aria-label="Hide balance values" aria-pressed="false">◉</button>
+                            </div>
+                            <p id="send-conversion-hint" class="conversion-hint hidden"></p>
+                            <div class="send-balance-detail"><span>Fee</span><strong id="send-balance-fee">Calculated at preview</strong></div>
+                            <div class="send-balance-detail"><span id="send-balance-result-label">Remaining after payment</span><strong id="send-balance-result">--</strong></div>
+                            <p id="send-balance-entry-status" class="send-balance-status">Enter an amount to see the estimate.</p>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -810,8 +810,7 @@
                             <strong id="preview-total" class="payment-preview-value amount"></strong>
                         </div>
                         <div class="send-balance-preview" id="send-balance-preview">
-                            <div class="payment-preview-row"><span>Spendable:</span><strong id="preview-spendable" class="payment-preview-value"></strong></div>
-                            <div class="payment-preview-row"><span>Remaining:</span><strong id="preview-remaining" class="payment-preview-value"></strong></div>
+                            <div class="payment-preview-row"><span id="preview-balance-result-label">Remaining:</span><strong id="preview-remaining" class="payment-preview-value"></strong></div>
                             <p id="preview-balance-status" class="send-balance-status"></p>
                         </div>
                         <div class="payment-preview-row hidden" id="preview-comment-row">

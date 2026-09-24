@@ -3972,6 +3972,11 @@ body.modal-open {
 .withdraw-balance-line { margin: 0; }
 .withdraw-balance-value { color: var(--brand); }
 .send-balance-heading { display: flex; align-items: center; justify-content: space-between; color: var(--text-secondary); font-size: 12px; }
+.send-balance-summary { margin-top: 10px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--card-bg); }
+.send-balance-summary.insufficient { border-color: var(--error); background: rgba(255, 84, 84, 0.08); }
+.send-balance-detail { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 12px; color: var(--text-secondary); }
+.send-balance-detail strong { color: var(--text-primary); text-align: right; }
+.send-balance-summary.insufficient .send-balance-detail strong { color: var(--error); }
 .send-balance-privacy-toggle { border: 0; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 16px; padding: 2px 4px; }
 .send-balance-status { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
 .send-balance-status.sufficient { color: var(--success); }
