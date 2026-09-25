@@ -432,6 +432,37 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      case 'EXPORT_ENCRYPTED_BACKUP':
+        try {
+          const { masterKeyId, pin, password } = message;
+          if (typeof masterKeyId !== 'string' || typeof pin !== 'string' || typeof password !== 'string' || password.length < 8) {
+            throw new Error('A wallet, PIN, and backup password of at least 8 characters are required');
+          }
+          const backup = await storageManager.exportActiveWalletBackup(masterKeyId, pin, password);
+          await storageManager.resetPinAttempts();
+          sendResponse({ success: true, data: backup });
+        } catch (error) {
+          await storageManager.recordFailedPin();
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Backup export failed' });
+        }
+        break;
+
+      case 'RESTORE_ENCRYPTED_BACKUP':
+        try {
+          const { backup, password, newWalletPin, nickname, expectedActiveMasterKeyId } = message;
+          if (!backup || typeof password !== 'string' || password.length < 8 || typeof newWalletPin !== 'string' || typeof nickname !== 'string' || typeof expectedActiveMasterKeyId !== 'string') {
+            throw new Error('A backup file, backup password, wallet PIN, and wallet name are required');
+          }
+          if (JSON.stringify(backup).length > 1024 * 1024) throw new Error('Backup file is too large');
+          const restored = await storageManager.restoreEncryptedBackup(backup, password, newWalletPin, nickname, expectedActiveMasterKeyId);
+          await storageManager.resetPinAttempts();
+          sendResponse({ success: true, data: restored });
+        } catch (error) {
+          console.error('[Background] RESTORE_ENCRYPTED_BACKUP failed:', error instanceof Error ? error.message : 'Unknown error');
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Backup restore failed' });
+        }
+        break;
+
       case 'SAVE_DOMAIN_SETTINGS':
         await storageManager.saveDomainSettings(message.domain, message.status);
         sendResponse({ success: true });

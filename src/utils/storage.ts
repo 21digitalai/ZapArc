@@ -20,6 +20,7 @@ import {
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 import * as bip39 from 'bip39';
 import { DEFAULT_INVOICE_EXPIRY_SECS } from './invoice-expiry';
+import { decryptBackupMnemonic, encryptBackupMnemonic, EncryptedBackup } from './backup-crypto';
 
 /**
  * Generate a UUID v4 string
@@ -334,6 +335,128 @@ export class ChromeStorageManager {
     const contacts = await this.getContacts();
     const filtered = contacts.filter(c => c.id !== id);
     await this.saveContacts(filtered);
+  }
+
+  /**
+   * Creates a portable encrypted snapshot for the active master wallet. Contacts
+   * deliberately remain global product data, so each backup carries the complete
+   * address book while wallet secrets remain scoped to the active master.
+   */
+  async exportActiveWalletBackup(activeMasterKeyId: string, pin: string, password: string): Promise<EncryptedBackup> {
+    return this.withStorageLock(async () => {
+      const result = await chrome.storage.local.get(['multiWalletData', 'contacts']);
+      const data = this.readMultiWalletData(result.multiWalletData);
+      if (data.activeWalletId !== activeMasterKeyId) throw new Error('Active wallet changed; try again');
+
+      const wallet = data.wallets.find(entry => entry.metadata.id === activeMasterKeyId);
+      if (!wallet) throw new Error('Active wallet is unavailable');
+
+      const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
+      const contacts = this.readContacts(result.contacts);
+      return encryptBackupMnemonic(mnemonic, password, wallet.metadata.nickname, JSON.stringify(contacts));
+    });
+  }
+
+  /**
+   * Restores a backup as a new master wallet and atomically merges its global
+   * contacts. Any write or verification failure restores both prior documents.
+   */
+  async restoreEncryptedBackup(
+    backup: unknown,
+    password: string,
+    newWalletPin: string,
+    nickname: string,
+    expectedActiveMasterKeyId: string,
+  ): Promise<{ walletId: string; importedContacts: number; skippedContacts: number }> {
+    const candidate = await decryptBackupMnemonic(backup, password);
+    const mnemonic = this.ensureValidBip39Mnemonic(candidate.mnemonic);
+    const importedContacts = this.parseBackupContacts(candidate.contacts);
+
+    return this.withStorageLock(async () => {
+      const result = await chrome.storage.local.get(['multiWalletData', 'contacts', 'walletVersion']);
+      const data = this.readMultiWalletData(result.multiWalletData);
+      if (data.activeWalletId !== expectedActiveMasterKeyId) throw new Error('Active wallet changed; try again');
+      if (await this.hasDuplicateMnemonic(data, mnemonic, newWalletPin)) throw new Error('This wallet has already been imported');
+
+      const walletId = generateUUID();
+      const encryptedMnemonic = await this.encryptMnemonic(mnemonic, newWalletPin);
+      const now = Date.now();
+      data.wallets.push({ metadata: { id: walletId, nickname: nickname.trim() || 'Restored wallet', createdAt: now, lastUsedAt: now }, encryptedMnemonic });
+      data.walletOrder.push(walletId);
+
+      const existingContacts = this.readContacts(result.contacts);
+      const merge = this.mergeContacts(existingContacts, importedContacts);
+      const originalWallets = result.multiWalletData;
+      const originalContacts = result.contacts;
+      try {
+        await chrome.storage.local.set({ multiWalletData: JSON.stringify(data), contacts: merge.contacts, walletVersion: result.walletVersion || 1 });
+        await this.verifyStoredMnemonicRoundTrip(walletId, mnemonic, newWalletPin);
+        const persistedContacts = (await chrome.storage.local.get(['contacts'])).contacts;
+        if (!Array.isArray(persistedContacts) || persistedContacts.length !== merge.contacts.length) throw new Error('Contact restore verification failed');
+      } catch (error) {
+        await chrome.storage.local.set({ multiWalletData: originalWallets, contacts: originalContacts, walletVersion: result.walletVersion });
+        throw error;
+      }
+
+      return { walletId, importedContacts: merge.imported, skippedContacts: merge.skipped };
+    });
+  }
+
+  private readMultiWalletData(serialized: unknown): MultiWalletStorage {
+    if (typeof serialized !== 'string') throw new Error('No wallet data found');
+    try {
+      const data = JSON.parse(serialized) as MultiWalletStorage;
+      if (!Array.isArray(data.wallets) || !Array.isArray(data.walletOrder) || typeof data.activeWalletId !== 'string') throw new Error();
+      return data;
+    } catch {
+      throw new Error('Wallet storage is invalid');
+    }
+  }
+
+  private readContacts(value: unknown): Contact[] {
+    return Array.isArray(value) ? value.filter(contact => this.isValidContact(contact)) : [];
+  }
+
+  private parseBackupContacts(serialized?: string): Contact[] {
+    if (serialized === undefined) return [];
+    if (serialized.length > 512 * 1024) throw new Error('Backup contacts are too large');
+    try {
+      const contacts = JSON.parse(serialized);
+      if (!Array.isArray(contacts) || !contacts.every(contact => this.isValidContact(contact))) throw new Error();
+      return contacts;
+    } catch {
+      throw new Error('Backup contacts are invalid');
+    }
+  }
+
+  private isValidContact(value: unknown): value is Contact {
+    if (!value || typeof value !== 'object') return false;
+    const contact = value as Contact;
+    return typeof contact.id === 'string' && typeof contact.name === 'string' && typeof contact.lightningAddress === 'string' && contact.lightningAddress.trim().length > 0;
+  }
+
+  private mergeContacts(existing: Contact[], incoming: Contact[]): { contacts: Contact[]; imported: number; skipped: number } {
+    const identities = new Set(existing.map(contact => contact.lightningAddress.trim().toLowerCase()));
+    const additions: Contact[] = [];
+    let skipped = 0;
+    incoming.forEach(contact => {
+      const identity = contact.lightningAddress.trim().toLowerCase();
+      if (identities.has(identity)) { skipped += 1; return; }
+      identities.add(identity);
+      additions.push({ ...contact, lightningAddress: identity });
+    });
+    return { contacts: [...existing, ...additions], imported: additions.length, skipped };
+  }
+
+  private async hasDuplicateMnemonic(data: MultiWalletStorage, mnemonic: string, pin: string): Promise<boolean> {
+    for (const wallet of data.wallets) {
+      try {
+        if (this.normalizeMnemonicForComparison(await this.decryptMnemonic(wallet.encryptedMnemonic, pin)) === mnemonic) return true;
+      } catch {
+        // Wallets may use independent PINs; inability to decrypt is not a duplicate verdict.
+      }
+    }
+    return false;
   }
 
   /**

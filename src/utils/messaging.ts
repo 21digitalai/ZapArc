@@ -237,6 +237,24 @@ export class ExtensionMessaging {
     });
   }
 
+  /** Creates an encrypted local backup without exposing its decrypted contents to the popup. */
+  static async exportEncryptedBackup(masterKeyId: string, pin: string, password: string): Promise<MessageResponse<import('./backup-crypto').EncryptedBackup>> {
+    return this.sendToBackground({ type: 'EXPORT_ENCRYPTED_BACKUP', masterKeyId, pin, password });
+  }
+
+  /** Restores a validated encrypted local backup and returns only safe summary data. */
+  static async restoreEncryptedBackup(
+    backup: unknown,
+    password: string,
+    newWalletPin: string,
+    nickname: string,
+    expectedActiveMasterKeyId: string,
+  ): Promise<MessageResponse<{ walletId: string; importedContacts: number; skippedContacts: number }>> {
+    return this.sendToBackground({
+      type: 'RESTORE_ENCRYPTED_BACKUP', backup, password, newWalletPin, nickname, expectedActiveMasterKeyId,
+    });
+  }
+
   /**
    * Save domain settings
    */
