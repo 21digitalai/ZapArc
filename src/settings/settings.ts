@@ -171,7 +171,7 @@ function setupBackupControls(): void {
     exportButton.addEventListener('click', async () => {
         exportButton.disabled = true;
         try {
-            const credentials = getBackupCredentials(true);
+            const credentials = getExportBackupCredentials();
             if (!credentials) return;
             const activeWalletId = await getActiveMasterKeyId();
             if (!activeWalletId) return;
@@ -196,14 +196,14 @@ function setupBackupControls(): void {
     restoreButton.addEventListener('click', async () => {
         restoreButton.disabled = true;
         try {
-            const credentials = getBackupCredentials(false);
+            const credentials = getRestoreBackupCredentials();
             if (!credentials || !selectedBackupFile) return;
             if (selectedBackupFile.size > 1024 * 1024) throw new Error('Backup file is too large');
             const backup = JSON.parse(await selectedBackupFile.text());
             const activeWalletId = await getActiveMasterKeyId();
             if (!activeWalletId) return;
             const nickname = (document.getElementById('restore-wallet-name') as HTMLInputElement).value.trim() || 'Restored wallet';
-            const response = await ExtensionMessaging.restoreEncryptedBackup(backup, credentials.password, credentials.walletPin, nickname, activeWalletId);
+            const response = await ExtensionMessaging.restoreEncryptedBackup(backup, credentials.password, credentials.newWalletPin, nickname, activeWalletId);
             if (!response.success || !response.data) throw new Error(response.error || 'Backup restore failed');
             clearBackupPasswordFields();
             selectedBackupFile = null;
@@ -218,7 +218,7 @@ function setupBackupControls(): void {
     });
 }
 
-function getBackupCredentials(requireConfirmation: boolean): { walletPin: string; password: string } | null {
+function getExportBackupCredentials(): { walletPin: string; password: string } | null {
     const walletPin = (document.getElementById('backup-wallet-pin') as HTMLInputElement).value;
     const password = (document.getElementById('backup-password') as HTMLInputElement).value;
     const confirmation = (document.getElementById('backup-password-confirm') as HTMLInputElement).value;
@@ -226,11 +226,25 @@ function getBackupCredentials(requireConfirmation: boolean): { walletPin: string
         showError('Enter your active wallet PIN and a backup password of at least 8 characters.');
         return null;
     }
-    if (requireConfirmation && password !== confirmation) {
+    if (password !== confirmation) {
         showError('Backup password confirmation does not match.');
         return null;
     }
     return { walletPin, password };
+}
+
+function getRestoreBackupCredentials(): { password: string; newWalletPin: string } | null {
+    const password = (document.getElementById('backup-password') as HTMLInputElement).value;
+    const newWalletPin = (document.getElementById('restore-wallet-pin') as HTMLInputElement).value;
+    if (password.length < 8) {
+        showError('Enter the backup password used to encrypt this file.');
+        return null;
+    }
+    if (!/^\d{6}$/.test(newWalletPin)) {
+        showError('Choose a new six-digit PIN for the restored wallet.');
+        return null;
+    }
+    return { password, newWalletPin };
 }
 
 async function getActiveMasterKeyId(): Promise<string | null> {
@@ -252,7 +266,7 @@ function downloadBackup(backup: unknown): void {
 }
 
 function clearBackupPasswordFields(): void {
-    ['backup-wallet-pin', 'backup-password', 'backup-password-confirm'].forEach(id => {
+    ['backup-wallet-pin', 'backup-password', 'backup-password-confirm', 'restore-wallet-pin'].forEach(id => {
         (document.getElementById(id) as HTMLInputElement).value = '';
     });
 }

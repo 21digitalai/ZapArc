@@ -105,6 +105,9 @@
                     <span id="restore-backup-filename" class="backup-file-name">No file selected</span>
                     <label for="restore-wallet-name">Restored wallet name</label>
                     <input id="restore-wallet-name" class="backup-input" type="text" maxlength="64" placeholder="Restored wallet">
+                    <label for="restore-wallet-pin">New PIN for restored wallet</label>
+                    <input id="restore-wallet-pin" class="backup-input" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="Six digits">
+                    <p class="backup-copy">Choose a new six-digit PIN for the restored wallet. Your active wallet PIN is only used when downloading a backup.</p>
                     <button id="restore-backup" class="backup-action-btn backup-action-btn-secondary" type="button" disabled>Restore encrypted backup</button>
                 </div>
             </section>
