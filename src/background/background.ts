@@ -6,6 +6,7 @@ import { WalletManager } from '../utils/wallet-manager';
 import { ChromeStorageManager } from '../utils/storage';
 import { LnurlManager, convertToLnurl } from '../utils/lnurl';
 import { changeActiveWalletPin } from '../utils/pin-change';
+import { isBackupExportPinFailure } from './backup-export-auth';
 import * as bip39 from 'bip39';
 
 // Breez SDK API key (client certificate for Spark implementation)
@@ -447,7 +448,9 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           await storageManager.resetPinAttempts();
           sendResponse({ success: true, data: backup });
         } catch (error) {
-          await storageManager.recordFailedPin();
+          if (isBackupExportPinFailure(error)) {
+            await storageManager.recordFailedPin();
+          }
           sendResponse({ success: false, error: error instanceof Error ? error.message : 'Backup export failed' });
         }
         break;

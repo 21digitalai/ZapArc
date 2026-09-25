@@ -6,7 +6,7 @@ import { ChromeStorageManager } from './storage';
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const RESTORE_MNEMONIC = bip39.generateMnemonic();
 
-function makeManager(options: { failFirstWrite?: boolean; switchActiveDuringEncryption?: boolean } = {}) {
+function makeManager(options: { failFirstWrite?: boolean; switchActiveDuringEncryption?: boolean; corruptContactsWrite?: boolean } = {}) {
   let walletData = JSON.stringify({
     version: 1,
     activeWalletId: 'active',
@@ -24,7 +24,11 @@ function makeManager(options: { failFirstWrite?: boolean; switchActiveDuringEncr
       setCalls += 1;
       if (options.failFirstWrite && setCalls === 1) throw new Error('Simulated storage failure');
       if (value.multiWalletData !== undefined) walletData = value.multiWalletData;
-      if (value.contacts !== undefined) contacts = value.contacts;
+      if (value.contacts !== undefined) {
+        contacts = options.corruptContactsWrite && setCalls === 1
+          ? [{ id: 'corrupt', name: 'Corrupt', lightningAddress: 'corrupt@example.com', createdAt: 1, updatedAt: 1 }]
+          : value.contacts;
+      }
     },
   } } };
   const manager = Object.create(ChromeStorageManager.prototype) as ChromeStorageManager;
@@ -77,6 +81,19 @@ describe('encrypted backup storage transaction', () => {
     ]));
 
     await expect(fixture.manager.restoreEncryptedBackup(backup, 'BackupPass1', '111111', 'Restored', 'active')).rejects.toThrow('Simulated storage failure');
+
+    expect(fixture.state()).toEqual(before);
+    expect(fixture.writes()).toBe(2);
+  });
+
+  it('rolls back both documents when a same-length contacts write is corrupted', async () => {
+    const fixture = makeManager({ corruptContactsWrite: true });
+    const before = fixture.state();
+    const backup = await encryptBackupMnemonic(RESTORE_MNEMONIC, 'BackupPass1', 'Restored', JSON.stringify([
+      { id: 'new', name: 'New', lightningAddress: 'new@example.com', createdAt: 2, updatedAt: 2 },
+    ]));
+
+    await expect(fixture.manager.restoreEncryptedBackup(backup, 'BackupPass1', '111111', 'Restored', 'active')).rejects.toThrow('Contact restore verification failed');
 
     expect(fixture.state()).toEqual(before);
     expect(fixture.writes()).toBe(2);

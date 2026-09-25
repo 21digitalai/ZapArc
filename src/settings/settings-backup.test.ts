@@ -35,4 +35,10 @@ describe('Settings encrypted backup controls', () => {
     expect(exportCase.indexOf('checkPinLockout()')).toBeLessThan(exportCase.indexOf('exportActiveWalletBackup'));
     expect(backgroundSource).toContain('/^\\d{6}$/.test(newWalletPin)');
   });
+
+  it('records export PIN failures only through the authentication classifier', () => {
+    const exportCase = backgroundSource.split("case 'EXPORT_ENCRYPTED_BACKUP':")[1].split("case 'RESTORE_ENCRYPTED_BACKUP':")[0];
+    expect(exportCase).toContain('isBackupExportPinFailure(error)');
+    expect(exportCase).not.toContain('catch (error) {\n          await storageManager.recordFailedPin()');
+  });
 });

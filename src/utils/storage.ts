@@ -399,7 +399,9 @@ export class ChromeStorageManager {
         await chrome.storage.local.set({ multiWalletData: JSON.stringify(data), contacts: merge.contacts, walletVersion: result.walletVersion || 1 });
         await this.verifyStoredMnemonicRoundTrip(walletId, mnemonic, newWalletPin);
         const persistedContacts = (await chrome.storage.local.get(['contacts'])).contacts;
-        if (!Array.isArray(persistedContacts) || persistedContacts.length !== merge.contacts.length) throw new Error('Contact restore verification failed');
+        if (JSON.stringify(persistedContacts) !== JSON.stringify(merge.contacts)) {
+          throw new Error('Contact restore verification failed');
+        }
       } catch (error) {
         if (restoreWriteStarted) {
           await chrome.storage.local.set({ multiWalletData: originalWallets, contacts: originalContacts, walletVersion: result.walletVersion });
