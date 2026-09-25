@@ -799,6 +799,14 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      case 'GET_ACTIVE_MASTER_KEY':
+        try {
+          sendResponse({ success: true, data: await storageManager.getActiveMasterKeyId() });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to get active wallet' });
+        }
+        break;
+
       case 'GET_SUB_WALLETS':
         try {
           const { masterKeyId, includeArchived } = message;

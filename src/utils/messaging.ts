@@ -731,6 +731,10 @@ export class ExtensionMessaging {
     });
   }
 
+  static async getActiveMasterKeyId(): Promise<MessageResponse<string>> {
+    return this.sendToBackground({ type: 'GET_ACTIVE_MASTER_KEY' });
+  }
+
   /**
    * Get sub-wallets for a specific master key
    * @param masterKeyId - UUID of the master key

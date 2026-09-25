@@ -84,6 +84,30 @@
                     </div>
                 </div>
             </section>
+
+            <section id="backup-settings" class="backup-settings">
+                <h2>Backup</h2>
+                <p class="backup-copy">Create a password-encrypted local backup of your active wallet and global contacts. ZapArc never uploads this file.</p>
+                <div class="setting-group backup-fields">
+                    <label for="backup-wallet-pin">Active wallet PIN</label>
+                    <input id="backup-wallet-pin" class="backup-input" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Unlock active wallet">
+                    <label for="backup-password">Backup password</label>
+                    <input id="backup-password" class="backup-input" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+                    <label for="backup-password-confirm">Confirm backup password</label>
+                    <input id="backup-password-confirm" class="backup-input" type="password" autocomplete="new-password" placeholder="Repeat backup password">
+                    <button id="export-backup" class="backup-action-btn" type="button">Download encrypted backup</button>
+                </div>
+                <div class="setting-group backup-fields">
+                    <h3>Restore from Backup</h3>
+                    <p class="backup-copy">Restore adds the wallet without replacing existing wallets. New contacts are merged; existing contact entries are kept.</p>
+                    <input id="restore-backup-file" class="backup-file-input" type="file" accept="application/json,.json" aria-label="Choose encrypted backup file">
+                    <label for="restore-backup-file" class="backup-file-btn">Choose encrypted backup file</label>
+                    <span id="restore-backup-filename" class="backup-file-name">No file selected</span>
+                    <label for="restore-wallet-name">Restored wallet name</label>
+                    <input id="restore-wallet-name" class="backup-input" type="text" maxlength="64" placeholder="Restored wallet">
+                    <button id="restore-backup" class="backup-action-btn backup-action-btn-secondary" type="button" disabled>Restore encrypted backup</button>
+                </div>
+            </section>
             
             <div id="actions">
                 <button id="save-settings">Save Settings</button>

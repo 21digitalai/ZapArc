@@ -10,6 +10,7 @@ console.log('ZapArc settings page loaded');
 
 // DOM elements
 let currentSettings: UserSettings;
+let selectedBackupFile: File | null = null;
 
 // Initialize settings page
 document.addEventListener('DOMContentLoaded', async () => {
@@ -156,6 +157,103 @@ function setupEventListeners(): void {
                 }, 1000);
             });
         }
+    });
+
+    setupBackupControls();
+}
+
+function setupBackupControls(): void {
+    const exportButton = document.getElementById('export-backup') as HTMLButtonElement;
+    const restoreButton = document.getElementById('restore-backup') as HTMLButtonElement;
+    const fileInput = document.getElementById('restore-backup-file') as HTMLInputElement;
+    const fileName = document.getElementById('restore-backup-filename') as HTMLElement;
+
+    exportButton.addEventListener('click', async () => {
+        exportButton.disabled = true;
+        try {
+            const credentials = getBackupCredentials(true);
+            if (!credentials) return;
+            const activeWalletId = await getActiveMasterKeyId();
+            if (!activeWalletId) return;
+            const response = await ExtensionMessaging.exportEncryptedBackup(activeWalletId, credentials.walletPin, credentials.password);
+            if (!response.success || !response.data) throw new Error(response.error || 'Backup export failed');
+            downloadBackup(response.data);
+            clearBackupPasswordFields();
+            showSuccess('Encrypted backup downloaded. Store the file and password safely.');
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Backup export failed');
+        } finally {
+            exportButton.disabled = false;
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        selectedBackupFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        fileName.textContent = selectedBackupFile ? selectedBackupFile.name : 'No file selected';
+        restoreButton.disabled = !selectedBackupFile;
+    });
+
+    restoreButton.addEventListener('click', async () => {
+        restoreButton.disabled = true;
+        try {
+            const credentials = getBackupCredentials(false);
+            if (!credentials || !selectedBackupFile) return;
+            if (selectedBackupFile.size > 1024 * 1024) throw new Error('Backup file is too large');
+            const backup = JSON.parse(await selectedBackupFile.text());
+            const activeWalletId = await getActiveMasterKeyId();
+            if (!activeWalletId) return;
+            const nickname = (document.getElementById('restore-wallet-name') as HTMLInputElement).value.trim() || 'Restored wallet';
+            const response = await ExtensionMessaging.restoreEncryptedBackup(backup, credentials.password, credentials.walletPin, nickname, activeWalletId);
+            if (!response.success || !response.data) throw new Error(response.error || 'Backup restore failed');
+            clearBackupPasswordFields();
+            selectedBackupFile = null;
+            fileInput.value = '';
+            fileName.textContent = 'No file selected';
+            showSuccess(`Backup restored: ${response.data.importedContacts} contacts imported, ${response.data.skippedContacts} kept locally.`);
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Backup restore failed');
+        } finally {
+            restoreButton.disabled = !selectedBackupFile;
+        }
+    });
+}
+
+function getBackupCredentials(requireConfirmation: boolean): { walletPin: string; password: string } | null {
+    const walletPin = (document.getElementById('backup-wallet-pin') as HTMLInputElement).value;
+    const password = (document.getElementById('backup-password') as HTMLInputElement).value;
+    const confirmation = (document.getElementById('backup-password-confirm') as HTMLInputElement).value;
+    if (!walletPin || password.length < 8) {
+        showError('Enter your active wallet PIN and a backup password of at least 8 characters.');
+        return null;
+    }
+    if (requireConfirmation && password !== confirmation) {
+        showError('Backup password confirmation does not match.');
+        return null;
+    }
+    return { walletPin, password };
+}
+
+async function getActiveMasterKeyId(): Promise<string | null> {
+    const response = await ExtensionMessaging.getActiveMasterKeyId();
+    if (response.success && response.data) return response.data;
+    showError(response.error || 'Could not determine the active wallet.');
+    return null;
+}
+
+function downloadBackup(backup: unknown): void {
+    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `zaparc-backup-${date}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function clearBackupPasswordFields(): void {
+    ['backup-wallet-pin', 'backup-password', 'backup-password-confirm'].forEach(id => {
+        (document.getElementById(id) as HTMLInputElement).value = '';
     });
 }
 

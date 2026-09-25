@@ -124,6 +124,12 @@
 
 `.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
 
+`.backup-settings`, `.backup-fields`, `.backup-copy` — Settings-local encrypted backup surface and grouped helper text.
+
+`.backup-input`, `.backup-action-btn`, `.backup-action-btn-secondary` — password/name fields and primary/secondary local backup actions.
+
+`.backup-file-input`, `.backup-file-btn`, `.backup-file-name` — hidden native backup-file input, its styled trigger, and selected-file status. The input must remain visually hidden.
+
 `.send-balance-detail` — compact Send estimate-card row for fee-inclusive total and post-payment result; use within the single `.send-balance-summary` surface and apply its semantic insufficient state rather than creating duplicate balance cards.
 
 ### Transaction diagnostics

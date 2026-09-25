@@ -1589,6 +1589,11 @@ export class ChromeStorageManager {
     }
   }
 
+  async getActiveMasterKeyId(): Promise<string> {
+    const result = await chrome.storage.local.get(['multiWalletData']);
+    return this.readMultiWalletData(result.multiWalletData).activeWalletId;
+  }
+
   /**
    * Get sub-wallets for a specific wallet (master key)
    * Returns the wallet itself (index 0) plus any derived sub-wallets
