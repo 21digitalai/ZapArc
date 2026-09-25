@@ -438,6 +438,11 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           if (typeof masterKeyId !== 'string' || typeof pin !== 'string' || typeof password !== 'string' || password.length < 8) {
             throw new Error('A wallet, PIN, and backup password of at least 8 characters are required');
           }
+          const lockout = await storageManager.checkPinLockout();
+          if (lockout.locked) {
+            sendResponse({ success: false, error: `Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.` });
+            break;
+          }
           const backup = await storageManager.exportActiveWalletBackup(masterKeyId, pin, password);
           await storageManager.resetPinAttempts();
           sendResponse({ success: true, data: backup });
@@ -450,7 +455,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'RESTORE_ENCRYPTED_BACKUP':
         try {
           const { backup, password, newWalletPin, nickname, expectedActiveMasterKeyId } = message;
-          if (!backup || typeof password !== 'string' || password.length < 8 || typeof newWalletPin !== 'string' || typeof nickname !== 'string' || typeof expectedActiveMasterKeyId !== 'string') {
+          if (!backup || typeof password !== 'string' || password.length < 8 || typeof newWalletPin !== 'string' || !/^\d{6}$/.test(newWalletPin) || typeof nickname !== 'string' || typeof expectedActiveMasterKeyId !== 'string') {
             throw new Error('A backup file, backup password, wallet PIN, and wallet name are required');
           }
           if (JSON.stringify(backup).length > 1024 * 1024) throw new Error('Backup file is too large');

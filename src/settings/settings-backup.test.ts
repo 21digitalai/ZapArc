@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const settingsHtml = readFileSync(new URL('./settings.html', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('./settings.ts', import.meta.url), 'utf8');
+const backgroundSource = readFileSync(new URL('../background/background.ts', import.meta.url), 'utf8');
 
 describe('Settings encrypted backup controls', () => {
   it('keeps the file picker hidden behind a styled action and exposes local backup actions', () => {
@@ -17,5 +18,12 @@ describe('Settings encrypted backup controls', () => {
     expect(settingsSource).toContain('ExtensionMessaging.restoreEncryptedBackup');
     expect(settingsSource).toContain('clearBackupPasswordFields();');
     expect(settingsSource).toContain('selectedBackupFile.size > 1024 * 1024');
+  });
+
+  it('preserves the privileged PIN lockout and six-digit restore PIN boundary', () => {
+    const exportCase = backgroundSource.split("case 'EXPORT_ENCRYPTED_BACKUP':")[1].split("case 'RESTORE_ENCRYPTED_BACKUP':")[0];
+    expect(exportCase).toContain('checkPinLockout()');
+    expect(exportCase.indexOf('checkPinLockout()')).toBeLessThan(exportCase.indexOf('exportActiveWalletBackup'));
+    expect(backgroundSource).toContain('/^\\d{6}$/.test(newWalletPin)');
   });
 });
