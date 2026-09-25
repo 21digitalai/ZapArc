@@ -388,13 +388,22 @@ export class ChromeStorageManager {
       const merge = this.mergeContacts(existingContacts, importedContacts);
       const originalWallets = result.multiWalletData;
       const originalContacts = result.contacts;
+      let restoreWriteStarted = false;
       try {
+        const currentWallets = await chrome.storage.local.get(['multiWalletData']);
+        const currentData = this.readMultiWalletData(currentWallets.multiWalletData);
+        if (currentData.activeWalletId !== expectedActiveMasterKeyId) {
+          throw new Error('Active wallet changed; try again');
+        }
+        restoreWriteStarted = true;
         await chrome.storage.local.set({ multiWalletData: JSON.stringify(data), contacts: merge.contacts, walletVersion: result.walletVersion || 1 });
         await this.verifyStoredMnemonicRoundTrip(walletId, mnemonic, newWalletPin);
         const persistedContacts = (await chrome.storage.local.get(['contacts'])).contacts;
         if (!Array.isArray(persistedContacts) || persistedContacts.length !== merge.contacts.length) throw new Error('Contact restore verification failed');
       } catch (error) {
-        await chrome.storage.local.set({ multiWalletData: originalWallets, contacts: originalContacts, walletVersion: result.walletVersion });
+        if (restoreWriteStarted) {
+          await chrome.storage.local.set({ multiWalletData: originalWallets, contacts: originalContacts, walletVersion: result.walletVersion });
+        }
         throw error;
       }
 

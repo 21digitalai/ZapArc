@@ -6,7 +6,7 @@ import { ChromeStorageManager } from './storage';
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const RESTORE_MNEMONIC = bip39.generateMnemonic();
 
-function makeManager() {
+function makeManager(options: { failFirstWrite?: boolean; switchActiveDuringEncryption?: boolean } = {}) {
   let walletData = JSON.stringify({
     version: 1,
     activeWalletId: 'active',
@@ -17,9 +17,12 @@ function makeManager() {
     ],
   });
   let contacts: unknown = [{ id: 'keep', name: 'Existing', lightningAddress: 'existing@example.com', createdAt: 1, updatedAt: 1 }];
+  let setCalls = 0;
   (globalThis as any).chrome = { storage: { local: {
     get: async () => ({ multiWalletData: walletData, contacts, walletVersion: 1 }),
     set: async (value: { multiWalletData?: string; contacts?: unknown }) => {
+      setCalls += 1;
+      if (options.failFirstWrite && setCalls === 1) throw new Error('Simulated storage failure');
       if (value.multiWalletData !== undefined) walletData = value.multiWalletData;
       if (value.contacts !== undefined) contacts = value.contacts;
     },
@@ -27,9 +30,16 @@ function makeManager() {
   const manager = Object.create(ChromeStorageManager.prototype) as ChromeStorageManager;
   (manager as any).withStorageLock = async (operation: () => Promise<unknown>) => operation();
   (manager as any).decryptMnemonic = async (entry: { data: number[] }) => entry.data[0] === 1 ? MNEMONIC : 'other wallet mnemonic';
-  (manager as any).encryptMnemonic = async () => ({ data: [3], iv: [1], timestamp: 1, salt: 'salt' });
+  (manager as any).encryptMnemonic = async () => {
+    if (options.switchActiveDuringEncryption) {
+      const data = JSON.parse(walletData);
+      data.activeWalletId = 'other';
+      walletData = JSON.stringify(data);
+    }
+    return { data: [3], iv: [1], timestamp: 1, salt: 'salt' };
+  };
   (manager as any).verifyStoredMnemonicRoundTrip = async () => undefined;
-  return { manager, state: () => ({ wallets: JSON.parse(walletData).wallets, contacts }) };
+  return { manager, state: () => ({ walletData, wallets: JSON.parse(walletData).wallets, contacts }), writes: () => setCalls };
 }
 
 describe('encrypted backup storage transaction', () => {
@@ -57,5 +67,42 @@ describe('encrypted backup storage transaction', () => {
       { id: 'keep', name: 'Existing', lightningAddress: 'existing@example.com', createdAt: 1, updatedAt: 1 },
       { id: 'new', name: 'New', lightningAddress: 'new@example.com', createdAt: 2, updatedAt: 2 },
     ]);
+  });
+
+  it('rolls back both wallet and contacts when the restore write fails', async () => {
+    const fixture = makeManager({ failFirstWrite: true });
+    const before = fixture.state();
+    const backup = await encryptBackupMnemonic(RESTORE_MNEMONIC, 'BackupPass1', 'Restored', JSON.stringify([
+      { id: 'new', name: 'New', lightningAddress: 'new@example.com', createdAt: 2, updatedAt: 2 },
+    ]));
+
+    await expect(fixture.manager.restoreEncryptedBackup(backup, 'BackupPass1', '111111', 'Restored', 'active')).rejects.toThrow('Simulated storage failure');
+
+    expect(fixture.state()).toEqual(before);
+    expect(fixture.writes()).toBe(2);
+  });
+
+  it('does not mutate storage when the active wallet changes during restore', async () => {
+    const fixture = makeManager({ switchActiveDuringEncryption: true });
+    const backup = await encryptBackupMnemonic(RESTORE_MNEMONIC, 'BackupPass1', 'Restored');
+
+    await expect(fixture.manager.restoreEncryptedBackup(backup, 'BackupPass1', '111111', 'Restored', 'active')).rejects.toThrow('Active wallet changed');
+
+    expect(fixture.state().wallets).toHaveLength(2);
+    expect(fixture.state().contacts).toHaveLength(1);
+    expect(fixture.writes()).toBe(0);
+  });
+
+  it('does not mutate wallets or contacts when the mnemonic already exists', async () => {
+    const fixture = makeManager();
+    const before = fixture.state();
+    const backup = await encryptBackupMnemonic(MNEMONIC, 'BackupPass1', 'Duplicate', JSON.stringify([
+      { id: 'new', name: 'New', lightningAddress: 'new@example.com', createdAt: 2, updatedAt: 2 },
+    ]));
+
+    await expect(fixture.manager.restoreEncryptedBackup(backup, 'BackupPass1', '111111', 'Duplicate', 'active')).rejects.toThrow('already been imported');
+
+    expect(fixture.state()).toEqual(before);
+    expect(fixture.writes()).toBe(0);
   });
 });
