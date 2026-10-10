@@ -132,6 +132,8 @@
 
 `.send-balance-detail` — compact Send estimate-card row for fee-inclusive total and post-payment result; use within the single `.send-balance-summary` surface and apply its semantic insufficient state rather than creating duplicate balance cards.
 
+`.onchain-send-estimate` — on-chain Send instance of the shared fee-inclusive estimate surface. It owns only the selected on-chain fee quote and is rendered immediately above the preview action; its `.send-balance-detail`, `.send-balance-status`, and `.send-balance-preview` children reuse the Lightning estimate contract.
+
 ### Transaction diagnostics
 
 `.tx-diagnostics-actions` — transaction-detail diagnostics action group.

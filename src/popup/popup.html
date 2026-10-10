@@ -867,6 +867,17 @@
                         <strong id="onchain-network-fee">—</strong>
                     </div>
 
+                    <div class="send-balance-summary onchain-send-estimate" id="onchain-send-estimate">
+                        <div class="send-balance-heading">
+                            <span>Payment estimate</span>
+                            <button id="onchain-balance-privacy-toggle" class="send-balance-privacy-toggle" type="button" aria-label="Hide balance values" aria-pressed="false">◉</button>
+                        </div>
+                        <div class="send-balance-detail"><span>Quoted fee</span><strong id="onchain-estimate-fee">Waiting for fee quote</strong></div>
+                        <div class="send-balance-detail"><span>Required total</span><strong id="onchain-estimate-total">Waiting for fee quote</strong></div>
+                        <div class="send-balance-detail"><span id="onchain-estimate-result-label">Remaining after payment</span><strong id="onchain-estimate-result">—</strong></div>
+                        <p id="onchain-estimate-status" class="send-balance-status">Enter an address and amount to get a fee quote.</p>
+                    </div>
+
                     <div class="payment-preview hidden" id="onchain-payment-preview">
                         <h4 class="payment-preview-title">On-chain Payment Preview</h4>
                         <div class="payment-preview-row">
@@ -888,6 +899,10 @@
                         <div class="payment-preview-row payment-preview-total">
                             <span>Total:</span>
                             <strong id="onchain-preview-total"></strong>
+                        </div>
+                        <div class="send-balance-preview" id="onchain-balance-preview">
+                            <div class="payment-preview-row"><span id="onchain-preview-result-label">Remaining:</span><strong id="onchain-preview-remaining" class="payment-preview-value"></strong></div>
+                            <p id="onchain-preview-status" class="send-balance-status"></p>
                         </div>
                     </div>
 

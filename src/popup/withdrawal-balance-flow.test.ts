@@ -161,4 +161,17 @@ describe('withdrawal balance flow', () => {
         expect(html).toContain('id="send-balance-result"');
         expect(html).not.toContain('Spendable balance');
     });
+
+    it('places one fee-inclusive on-chain estimate before its preview action', () => {
+        const html = readFileSync(new URL('./popup.html', import.meta.url), 'utf8');
+        const estimateIndex = html.indexOf('id="onchain-send-estimate"');
+        const previewActionIndex = html.indexOf('id="preview-onchain-payment-btn"');
+
+        expect(estimateIndex).toBeGreaterThan(-1);
+        expect(estimateIndex).toBeLessThan(previewActionIndex);
+        expect(html).toContain('id="onchain-estimate-fee"');
+        expect(html).toContain('id="onchain-estimate-total"');
+        expect(html).toContain('id="onchain-estimate-result"');
+        expect(html).toContain('id="onchain-preview-remaining"');
+    });
 });

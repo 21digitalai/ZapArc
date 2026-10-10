@@ -426,8 +426,11 @@ export function resetWithdrawForm(): void {
     });
 
     onchainPreparedBySpeed = {};
+    onchainQuoteInput = null;
+    onchainQuoteRequestId += 1;
     onchainSelectedSpeed = 'medium';
     updateSpeedSelectionUI();
+    renderOnchainBalanceSummary();
 }
 
 export function setupWithdrawalListeners(): void {
@@ -493,6 +496,20 @@ export function setupWithdrawalListeners(): void {
         privacyToggle.setAttribute('aria-pressed', String(sendBalancesHidden));
         updateEntryBalanceSummary();
         rerenderActivePaymentPreview();
+        updateOnchainPreviewFromSelection();
+    });
+    const onchainPrivacyToggle = document.getElementById('onchain-balance-privacy-toggle') as HTMLButtonElement | null;
+    onchainPrivacyToggle?.addEventListener('click', () => {
+        sendBalancesHidden = !sendBalancesHidden;
+        [privacyToggle, onchainPrivacyToggle].forEach((toggle) => {
+            if (!toggle) return;
+            toggle.textContent = sendBalancesHidden ? '◌' : '◉';
+            toggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
+            toggle.setAttribute('aria-pressed', String(sendBalancesHidden));
+        });
+        updateEntryBalanceSummary();
+        rerenderActivePaymentPreview();
+        updateOnchainPreviewFromSelection();
     });
 
     const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
@@ -560,6 +577,77 @@ export function validateWithdrawalForm(): void {
 }
 
 let onchainFeeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let onchainQuoteRequestId = 0;
+let onchainQuoteInput: { address: string; amount: number } | null = null;
+
+function getOnchainFeeSats(prepared: any): number | null {
+    const feeQuote = prepared?.paymentMethod?.feeQuote;
+    const speedKey = onchainSelectedSpeed === 'fast' ? 'speedFast' : onchainSelectedSpeed === 'slow' ? 'speedSlow' : 'speedMedium';
+    const quote = feeQuote?.[speedKey];
+    const serviceFee = Number(quote?.userFeeSat);
+    const l1Fee = Number(quote?.l1BroadcastFeeSat);
+    return Number.isFinite(serviceFee) && serviceFee >= 0 && Number.isFinite(l1Fee) && l1Fee >= 0
+        ? serviceFee + l1Fee
+        : null;
+}
+
+function currentOnchainInput(): { address: string; amount: number } {
+    const address = (document.getElementById('onchain-address-input') as HTMLInputElement | null)?.value.trim() || '';
+    const amount = parseInt((document.getElementById('onchain-amount-input') as HTMLInputElement | null)?.value || '0') || 0;
+    return { address, amount };
+}
+
+function hasCurrentOnchainQuote(input = currentOnchainInput()): boolean {
+    return onchainQuoteInput?.address === input.address && onchainQuoteInput.amount === input.amount;
+}
+
+function getOnchainBalanceSummary(): SendBalanceSummary {
+    const input = currentOnchainInput();
+    const prepared = hasCurrentOnchainQuote(input) ? onchainPreparedBySpeed[onchainSelectedSpeed] : null;
+    return calculateSendBalanceSummary(currentBalance, input.amount, getOnchainFeeSats(prepared));
+}
+
+function renderOnchainBalanceSummary(): SendBalanceSummary {
+    const summary = getOnchainBalanceSummary();
+    const hasAmount = summary.amountSats > 0;
+    const isInsufficient = summary.hasSufficientFunds === false;
+    const result = isInsufficient
+        ? Math.max(0, (summary.totalSats === null ? summary.amountSats : summary.totalSats) - summary.spendableSats)
+        : summary.remainingSats;
+    const status = !hasAmount
+        ? 'Enter an address and amount to get a fee quote.'
+        : isInsufficient
+            ? 'Insufficient balance — payment amount and selected fee are not covered.'
+            : summary.hasSufficientFunds === true
+                ? 'Sufficient funds for amount and selected fee.'
+                : 'Fee quote unavailable — remaining balance cannot be calculated yet.';
+    const setText = (id: string, value: string) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    };
+    setText('onchain-estimate-fee', summary.feeSats === null ? 'Waiting for fee quote' : formatSensitiveSats(summary.feeSats));
+    setText('onchain-estimate-total', summary.totalSats === null ? 'Waiting for fee quote' : formatSensitiveSats(summary.totalSats));
+    setText('onchain-estimate-result-label', isInsufficient ? 'Short by' : 'Remaining after payment');
+    setText('onchain-estimate-result', hasAmount ? formatSensitiveSats(result) : '—');
+    setText('onchain-estimate-status', status);
+    setText('onchain-preview-result-label', isInsufficient ? 'Short by:' : 'Remaining:');
+    setText('onchain-preview-remaining', formatSensitiveSats(result));
+    setText('onchain-preview-status', status);
+    ['onchain-send-estimate', 'onchain-balance-preview'].forEach((id) => {
+        document.getElementById(id)?.classList.toggle('insufficient', isInsufficient);
+    });
+    ['onchain-estimate-status', 'onchain-preview-status'].forEach((id) => {
+        const element = document.getElementById(id);
+        element?.classList.toggle('insufficient', isInsufficient);
+        element?.classList.toggle('sufficient', summary.hasSufficientFunds === true);
+    });
+    return summary;
+}
+
+function storeOnchainPrepared(prepared: any, input: { address: string; amount: number }): void {
+    onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
+    onchainQuoteInput = input;
+}
 
 function isValidBitcoinAddress(address: string): boolean {
     // Bech32 (native segwit): bc1q... (42 chars) or bc1p... (62 chars taproot)
@@ -581,6 +669,9 @@ function validateOnchainForm(): void {
 
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
+    onchainQuoteRequestId += 1;
+    onchainPreparedBySpeed = {};
+    onchainQuoteInput = null;
 
     const MIN_ONCHAIN_SATS = 1000;
 
@@ -608,7 +699,7 @@ function validateOnchainForm(): void {
     // Auto-fetch fees when address + amount are valid
     if (onchainFeeDebounceTimer) clearTimeout(onchainFeeDebounceTimer);
     if (address.length >= 14 && amount > 0) {
-        onchainFeeDebounceTimer = setTimeout(() => autoFetchOnchainFees(address, amount), 800);
+        onchainFeeDebounceTimer = setTimeout(() => autoFetchOnchainFees(address, amount, onchainQuoteRequestId), 800);
     } else {
         // Clear fees when inputs are incomplete
         (['fast', 'medium', 'slow'] as const).forEach(speed => {
@@ -618,9 +709,10 @@ function validateOnchainForm(): void {
         const feeSummary = document.getElementById('onchain-network-fee');
         if (feeSummary) feeSummary.textContent = '—';
     }
+    renderOnchainBalanceSummary();
 }
 
-async function autoFetchOnchainFees(address: string, amount: number): Promise<void> {
+async function autoFetchOnchainFees(address: string, amount: number, requestId: number): Promise<void> {
     if (!breezSDK) return;
 
     // Show loading state
@@ -635,7 +727,8 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
             amount: BigInt(amount)
         });
 
-        onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
+        if (requestId !== onchainQuoteRequestId) return;
+        storeOnchainPrepared(prepared, { address, amount });
 
         const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
         const speedMap = { fast: feeQuote?.speedFast, medium: feeQuote?.speedMedium, slow: feeQuote?.speedSlow } as const;
@@ -662,6 +755,7 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
             const feeEl = document.getElementById(`speed-fee-${speed}`);
             if (feeEl) feeEl.textContent = 'Fee: —';
         });
+        if (requestId === onchainQuoteRequestId) renderOnchainBalanceSummary();
     }
 }
 
@@ -681,6 +775,12 @@ async function previewOnchainPayment(): Promise<void> {
 
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
+    const existingSummary = renderOnchainBalanceSummary();
+    if (hasCurrentOnchainQuote({ address, amount }) && existingSummary.hasSufficientFunds === false) {
+        showError('Insufficient funds for this transaction amount and selected fee.');
+        return;
+    }
+    const requestId = ++onchainQuoteRequestId;
 
     try {
         if (!breezSDK) {
@@ -692,6 +792,7 @@ async function previewOnchainPayment(): Promise<void> {
         previewBtn.textContent = 'Preparing...';
 
         onchainPreparedBySpeed = {};
+        onchainQuoteInput = null;
 
         // Single prepare call — SDK returns fee quotes for all 3 speeds
         const prepared = await breezSDK.prepareSendPayment({
@@ -700,7 +801,8 @@ async function previewOnchainPayment(): Promise<void> {
         });
 
         // Store the same prepared response for all speeds (fee selection happens at send time)
-        onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
+        if (requestId !== onchainQuoteRequestId) return;
+        storeOnchainPrepared(prepared, { address, amount });
 
         // Extract per-speed fees from feeQuote
         const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
@@ -725,7 +827,8 @@ async function previewOnchainPayment(): Promise<void> {
     } catch (error) {
         showError(error instanceof Error ? error.message : 'Failed to preview on-chain transaction');
     } finally {
-        previewBtn.disabled = false;
+        const summary = renderOnchainBalanceSummary();
+        previewBtn.disabled = !isValidBitcoinAddress(address) || amount < 1000 || summary.hasSufficientFunds === false;
         previewBtn.textContent = 'Preview On-chain Transaction';
     }
 }
@@ -735,18 +838,14 @@ function updateOnchainPreviewFromSelection(): void {
     const previewDiv = document.getElementById('onchain-payment-preview');
     const sendBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
 
-    const address = (document.getElementById('onchain-address-input') as HTMLInputElement)?.value?.trim() || '';
-    const amount = parseInt((document.getElementById('onchain-amount-input') as HTMLInputElement)?.value || '0') || 0;
+    const { address, amount } = currentOnchainInput();
 
-    if (!prepared || !previewDiv || !sendBtn) return;
+    if (!prepared || !previewDiv || !sendBtn || !hasCurrentOnchainQuote({ address, amount })) return;
 
-    const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
-    const speedKey = onchainSelectedSpeed === 'fast' ? 'speedFast' : onchainSelectedSpeed === 'slow' ? 'speedSlow' : 'speedMedium';
-    const quote = feeQuote?.[speedKey];
-    const serviceFee = Number(quote?.userFeeSat ?? 0);
-    const l1Fee = Number(quote?.l1BroadcastFeeSat ?? 0);
-    const feeSats = serviceFee + l1Fee;
-    const total = amount + feeSats;
+    const summary = renderOnchainBalanceSummary();
+    const feeSats = summary.feeSats;
+    const total = summary.totalSats;
+    if (feeSats === null || total === null) return;
 
     const networkFeeSummary = document.getElementById('onchain-network-fee');
     if (networkFeeSummary) networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats`;
@@ -758,14 +857,14 @@ function updateOnchainPreviewFromSelection(): void {
     const totalEl = document.getElementById('onchain-preview-total');
 
     if (recipientEl) recipientEl.textContent = address;
-    if (amountEl) amountEl.textContent = `${amount.toLocaleString()} sats`;
-    if (feeEl) feeEl.textContent = `${feeSats.toLocaleString()} sats`;
+    setPreviewAmount(amountEl, amount);
+    setPreviewAmount(feeEl, feeSats);
     if (speedEl) speedEl.textContent = onchainSelectedSpeed[0].toUpperCase() + onchainSelectedSpeed.slice(1);
-    if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
+    setPreviewAmount(totalEl, total);
 
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
-    sendBtn.disabled = false;
+    sendBtn.disabled = summary.hasSufficientFunds !== true;
 }
 
 export async function previewPayment(): Promise<void> {
@@ -1133,7 +1232,12 @@ async function sendOnchainPayment(): Promise<void> {
     const statusText = document.getElementById('withdrawal-status-text');
 
     const prepared = onchainPreparedBySpeed[onchainSelectedSpeed];
-    if (!prepared) {
+    const summary = renderOnchainBalanceSummary();
+    if (!prepared || !hasCurrentOnchainQuote() || summary.hasSufficientFunds !== true) {
+        if (summary.hasSufficientFunds === false) {
+            showError('Insufficient funds for this transaction amount and selected fee.');
+            return;
+        }
         showError('Please preview the on-chain transaction first');
         return;
     }
