@@ -100,9 +100,15 @@ describe('rotateMasterKeyPin', () => {
     });
 });
 
-describe('Settings Change PIN action', () => {
-    it('keeps the documented semantic class on the existing Settings action', () => {
+describe('Master-wallet Change PIN action', () => {
+    it('keeps Change PIN out of Settings and on master-wallet entries only', () => {
         const popupHtml = readFileSync(new URL('../popup/popup.html', import.meta.url), 'utf8');
-        expect(popupHtml).toContain('id="settings-change-pin-btn" class="settings-change-pin-btn settings-action-btn"');
+        const walletManagement = readFileSync(new URL('../popup/wallet-management.ts', import.meta.url), 'utf8');
+
+        expect(popupHtml).not.toContain('id="settings-change-pin-btn"');
+        expect(walletManagement).toContain('class="master-wallet-pin-btn"');
+        expect(walletManagement).toContain("data-master-id=\"${wallet.id}\"");
+        expect(walletManagement).toContain("document.querySelectorAll('.master-wallet-pin-btn')");
+        expect(walletManagement).toContain("window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }))");
     });
 });
