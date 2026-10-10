@@ -601,6 +601,15 @@ function hasCurrentOnchainQuote(input = currentOnchainInput()): boolean {
     return onchainQuoteInput?.address === input.address && onchainQuoteInput.amount === input.amount;
 }
 
+function invalidateOnchainPreview(): void {
+    const previewDiv = document.getElementById('onchain-payment-preview');
+    const sendBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement | null;
+
+    previewDiv?.classList.add('hidden');
+    sendBtn?.classList.add('hidden');
+    if (sendBtn) sendBtn.disabled = true;
+}
+
 function getOnchainBalanceSummary(): SendBalanceSummary {
     const input = currentOnchainInput();
     const prepared = hasCurrentOnchainQuote(input) ? onchainPreparedBySpeed[onchainSelectedSpeed] : null;
@@ -681,6 +690,7 @@ function validateOnchainForm(): void {
     onchainQuoteRequestId += 1;
     onchainPreparedBySpeed = {};
     onchainQuoteInput = null;
+    invalidateOnchainPreview();
 
     const MIN_ONCHAIN_SATS = 1000;
 
@@ -854,7 +864,10 @@ function updateOnchainPreviewFromSelection(): void {
     const summary = renderOnchainBalanceSummary();
     const feeSats = summary.feeSats;
     const total = summary.totalSats;
-    if (feeSats === null || total === null) return;
+    if (feeSats === null || total === null) {
+        invalidateOnchainPreview();
+        return;
+    }
 
     const networkFeeSummary = document.getElementById('onchain-network-fee');
     if (networkFeeSummary) networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats`;

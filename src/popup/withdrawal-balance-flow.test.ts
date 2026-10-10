@@ -53,6 +53,26 @@ function createFixture(): Record<string, FakeElement> {
     return elements;
 }
 
+async function previewOnchain(
+    elements: Record<string, FakeElement>,
+    balance: number,
+    amount: string,
+    fee: { userFeeSat: number, l1BroadcastFeeSat: number } | undefined
+): Promise<void> {
+    state.balance = balance;
+    elements['onchain-address-input'].value = 'bc1q' + 'a'.repeat(38);
+    elements['onchain-amount-input'].value = amount;
+    state.sdk.prepareSendPayment.mockResolvedValue({ paymentMethod: { feeQuote: { speedMedium: fee } } });
+    vi.stubGlobal('document', {
+        getElementById: (id: string) => elements[id] || null,
+        createElement: () => new FakeElement(),
+        querySelectorAll: () => []
+    });
+    const { setupWithdrawalListeners } = await import('./withdrawal');
+    setupWithdrawalListeners();
+    await (elements['preview-onchain-payment-btn'].listeners.get('click')?.[0] as any)();
+}
+
 describe('withdrawal balance flow', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -184,20 +204,53 @@ describe('withdrawal balance flow', () => {
 
     it('renders selected on-chain quote amounts with sats and fiat-secondary slots before enabling Send', async () => {
         const elements = createFixture();
-        elements['onchain-address-input'].value = 'bc1q' + 'a'.repeat(38);
-        elements['onchain-amount-input'].value = '9000';
-        state.sdk.prepareSendPayment.mockResolvedValue({ paymentMethod: { feeQuote: { speedMedium: { userFeeSat: 500, l1BroadcastFeeSat: 501 } } } });
-        vi.stubGlobal('document', {
-            getElementById: (id: string) => elements[id] || null,
-            createElement: () => new FakeElement(),
-            querySelectorAll: () => []
-        });
-        const { setupWithdrawalListeners } = await import('./withdrawal');
-        setupWithdrawalListeners();
-        await (elements['preview-onchain-payment-btn'].listeners.get('click')?.[0] as any)();
+        await previewOnchain(elements, 10_000, '9000', { userFeeSat: 500, l1BroadcastFeeSat: 501 });
 
         expect(elements['onchain-estimate-fee'].children[0].textContent).toBe('1,001 sats');
         expect(elements['onchain-estimate-total'].children[0].textContent).toBe('10,001 sats');
         expect(elements['send-onchain-payment-btn'].disabled).toBe(true);
+    });
+
+    it.each([
+        ['zero balance', 0, '1000', { userFeeSat: 0, l1BroadcastFeeSat: 0 }, true, '1,000 sats'],
+        ['exact balance', 10_000, '9000', { userFeeSat: 500, l1BroadcastFeeSat: 500 }, false, '0 sats'],
+        ['one-sat short', 10_000, '9000', { userFeeSat: 500, l1BroadcastFeeSat: 501 }, true, '1 sats'],
+        ['fee-caused shortfall', 10_000, '10000', { userFeeSat: 1, l1BroadcastFeeSat: 0 }, true, '1 sats']
+    ])('applies the fee-inclusive affordability guard for %s', async (_name, balance, amount, fee, disabled, result) => {
+        const elements = createFixture();
+        await previewOnchain(elements, balance, amount, fee);
+
+        expect(elements['send-onchain-payment-btn'].disabled).toBe(disabled);
+        expect(elements['onchain-estimate-result'].children[0].textContent).toBe(result);
+    });
+
+    it('keeps an unknown fee non-precise and Send unavailable', async () => {
+        const elements = createFixture();
+        await previewOnchain(elements, 10_000, '9000', undefined);
+
+        expect(elements['onchain-estimate-fee'].textContent).toBe('Waiting for fee quote');
+        expect(elements['send-onchain-payment-btn'].disabled).toBe(true);
+    });
+
+    it('invalidates a prepared preview synchronously when the quote input changes', async () => {
+        const elements = createFixture();
+        await previewOnchain(elements, 10_000, '9000', { userFeeSat: 500, l1BroadcastFeeSat: 0 });
+        expect(elements['send-onchain-payment-btn'].disabled).toBe(false);
+
+        elements['onchain-amount-input'].value = '9001';
+        elements['onchain-amount-input'].listeners.get('input')?.[0]();
+
+        expect(elements['send-onchain-payment-btn'].disabled).toBe(true);
+        expect(elements['send-onchain-payment-btn'].classList.add).toHaveBeenCalledWith('hidden');
+        expect(elements['onchain-payment-preview'].classList.add).toHaveBeenCalledWith('hidden');
+    });
+
+    it('masks on-chain estimate values when privacy is enabled', async () => {
+        const elements = createFixture();
+        await previewOnchain(elements, 10_000, '9000', { userFeeSat: 500, l1BroadcastFeeSat: 0 });
+        elements['onchain-balance-privacy-toggle'].click();
+
+        expect(elements['onchain-estimate-fee'].children[0].textContent).toBe('••••••');
+        expect(elements['onchain-estimate-total'].children[0].textContent).toBe('••••••');
     });
 });
