@@ -94,7 +94,7 @@ describe('withdrawal balance flow', () => {
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 2_500, fee: 75, type: 'bolt11' });
 
         expect(elements['preview-remaining'].textContent).toBe('7,425 sats');
-        expect(elements['send-balance-total'].textContent).toBe('2,575 sats');
+        expect(elements['send-balance-total'].children[0].textContent).toBe('2,575 sats');
         expect(elements['preview-total'].children[0].textContent).toBe('2,575 sats');
         expect(elements['send-payment-btn'].disabled).toBe(false);
     });
@@ -130,6 +130,8 @@ describe('withdrawal balance flow', () => {
 
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 2_500, fee: undefined, type: 'bolt11' });
         expect(elements['send-payment-btn'].disabled).toBe(true);
+        expect(elements['send-balance-fee'].textContent).toBe('Calculated at preview');
+        expect(elements['send-balance-total'].textContent).toBe('Calculated at preview');
 
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 9_950, fee: 75, type: 'bolt11' });
         expect(elements['send-payment-btn'].disabled).toBe(true);
@@ -156,7 +158,7 @@ describe('withdrawal balance flow', () => {
 
         expect(elements['send-balance-entry-status'].textContent).toContain('Insufficient balance');
         expect(elements['send-balance-result-label'].textContent).toBe('Short by');
-        expect(elements['send-balance-result'].textContent).toBe('1 sats');
+        expect(elements['send-balance-result'].children[0].textContent).toBe('1 sats');
     });
 
     it('keeps every known fee, total, and shortfall value masked in the unified card', async () => {
@@ -171,9 +173,9 @@ describe('withdrawal balance flow', () => {
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 9_950, fee: 75, type: 'bolt11' });
         elements['send-balance-privacy-toggle'].click();
 
-        expect(elements['send-balance-fee'].textContent).toBe('••••••');
-        expect(elements['send-balance-total'].textContent).toBe('••••••');
-        expect(elements['send-balance-result'].textContent).toBe('••••••');
+        expect(elements['send-balance-fee'].children[0].textContent).toBe('••••••');
+        expect(elements['send-balance-total'].children[0].textContent).toBe('••••••');
+        expect(elements['send-balance-result'].children[0].textContent).toBe('••••••');
         expect(elements['preview-remaining'].textContent).toBe('••••••');
     });
 

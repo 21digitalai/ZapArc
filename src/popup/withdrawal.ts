@@ -62,9 +62,17 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const isInsufficient = shortfall !== null && shortfall > 0;
     const resultLabel = isInsufficient ? 'Short by' : 'Remaining after payment';
     const result = isInsufficient ? shortfall : summary.remainingSats;
-    if (entryFee) entryFee.textContent = summary.feeSats === null ? 'Calculated at preview' : formatSensitiveSats(summary.feeSats);
-    if (entryTotal) entryTotal.textContent = summary.totalSats === null ? 'Calculated at preview' : formatSensitiveSats(summary.totalSats);
-    if (entryResult) entryResult.textContent = formatSensitiveSats(result);
+    const setEntryAmount = (element: HTMLElement | null, sats: number | null, unavailable: string) => {
+        if (!element) return;
+        if (sats === null) {
+            element.textContent = unavailable;
+            return;
+        }
+        setPreviewAmount(element, sats);
+    };
+    setEntryAmount(entryFee, summary.feeSats, 'Calculated at preview');
+    setEntryAmount(entryTotal, summary.totalSats, 'Calculated at preview');
+    setEntryAmount(entryResult, result, 'Fee unavailable');
     if (entryResultLabel) entryResultLabel.textContent = resultLabel;
     if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(result);
     if (previewResultLabel) previewResultLabel.textContent = isInsufficient ? 'Short by:' : 'Remaining:';
