@@ -104,11 +104,13 @@ describe('Master-wallet Change PIN action', () => {
     it('keeps Change PIN out of Settings and on master-wallet entries only', () => {
         const popupHtml = readFileSync(new URL('../popup/popup.html', import.meta.url), 'utf8');
         const walletManagement = readFileSync(new URL('../popup/wallet-management.ts', import.meta.url), 'utf8');
+        const pinAction = readFileSync(new URL('../popup/master-wallet-pin-action.ts', import.meta.url), 'utf8');
 
         expect(popupHtml).not.toContain('id="settings-change-pin-btn"');
         expect(walletManagement).toContain('class="master-wallet-pin-btn"');
         expect(walletManagement).toContain("data-master-id=\"${wallet.id}\"");
-        expect(walletManagement).toContain("document.querySelectorAll('.master-wallet-pin-btn')");
+        expect(walletManagement).toContain('attachMasterWalletPinActions(document');
+        expect(pinAction).toContain("querySelectorAll('.master-wallet-pin-btn')");
         expect(walletManagement).toContain("window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }))");
     });
 });

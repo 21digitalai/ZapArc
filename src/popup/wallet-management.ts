@@ -36,6 +36,7 @@ import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK, discoverSubWalletsInPopup } from './sdk';
 import { showError, showSuccess, showInfo, showNotification } from './notifications';
 import { clearWalletDisplay, showTransactionsLoading } from './ui-helpers';
+import { attachMasterWalletPinActions } from './master-wallet-pin-action';
 
 // Track which wallets are currently being discovered
 const walletsBeingDiscovered = new Set<string>();
@@ -620,17 +621,20 @@ export async function populateWalletDropdown(): Promise<void> {
  * Attach listeners to hierarchical dropdown items
  */
 function attachDropdownListeners(): void {
-    document.querySelectorAll('.master-wallet-pin-btn').forEach(button => {
-        button.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            const masterId = (event.currentTarget as HTMLElement).getAttribute('data-master-id');
-            if (!masterId) return;
-            await handleHierarchicalWalletSwitch(masterId, 0);
+    attachMasterWalletPinActions(document, {
+        switchToMaster: async (masterId) => handleHierarchicalWalletSwitch(masterId, 0),
+        getActiveWallet: async () => {
             const storage = await chrome.storage.local.get(['multiWalletData']);
             const data = storage.multiWalletData ? JSON.parse(storage.multiWalletData) : null;
-            if (data?.activeWalletId !== masterId || (data?.activeSubWalletIndex || 0) !== 0) return;
+            if (!data?.activeWalletId) return null;
+            return {
+                masterId: data.activeWalletId,
+                subWalletIndex: data.activeSubWalletIndex || 0,
+            };
+        },
+        dispatchPinChange: (masterId) => {
             window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }));
-        });
+        },
     });
     // Master wallet header click to switch to master (index 0)
     document.querySelectorAll('.master-key-dropdown-header[data-sub-index="0"]').forEach(header => {
