@@ -625,10 +625,19 @@ function renderOnchainBalanceSummary(): SendBalanceSummary {
         const element = document.getElementById(id);
         if (element) element.textContent = value;
     };
-    setText('onchain-estimate-fee', summary.feeSats === null ? 'Waiting for fee quote' : formatSensitiveSats(summary.feeSats));
-    setText('onchain-estimate-total', summary.totalSats === null ? 'Waiting for fee quote' : formatSensitiveSats(summary.totalSats));
+    const setEstimateAmount = (id: string, sats: number | null, unavailable: string) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        if (sats === null) {
+            element.textContent = unavailable;
+            return;
+        }
+        setPreviewAmount(element, sats);
+    };
+    setEstimateAmount('onchain-estimate-fee', summary.feeSats, 'Waiting for fee quote');
+    setEstimateAmount('onchain-estimate-total', summary.totalSats, 'Waiting for fee quote');
     setText('onchain-estimate-result-label', isInsufficient ? 'Short by' : 'Remaining after payment');
-    setText('onchain-estimate-result', hasAmount ? formatSensitiveSats(result) : '—');
+    setEstimateAmount('onchain-estimate-result', hasAmount ? result : null, '—');
     setText('onchain-estimate-status', status);
     setText('onchain-preview-result-label', isInsufficient ? 'Short by:' : 'Remaining:');
     setText('onchain-preview-remaining', formatSensitiveSats(result));

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const state = vi.hoisted(() => ({ balance: 10_000, preparedPayment: { paymentMethod: {} } as any }));
+const state = vi.hoisted(() => ({ balance: 10_000, preparedPayment: { paymentMethod: {} } as any, sdk: { sendPayment: vi.fn(), lnurlPay: vi.fn(), prepareSendPayment: vi.fn() } }));
 const notifications = vi.hoisted(() => ({ showError: vi.fn(), showConfirmDialog: vi.fn(async () => true) }));
 
 vi.mock('./state', () => ({
-    get breezSDK() { return { sendPayment: vi.fn(), lnurlPay: vi.fn() }; },
+    get breezSDK() { return state.sdk; },
     get currentBalance() { return state.balance; },
     get preparedPayment() { return state.preparedPayment; },
     setPreparedPayment: vi.fn((payment: any) => { state.preparedPayment = payment; })
@@ -43,7 +43,11 @@ function createFixture(): Record<string, FakeElement> {
         'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total', 'send-balance-preview',
         'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-total', 'send-balance-result',
         'send-balance-result-label', 'send-balance-summary', 'preview-balance-result-label', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
-        'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn'
+        'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn',
+        'onchain-address-input', 'onchain-amount-input', 'preview-onchain-payment-btn', 'send-onchain-payment-btn',
+        'onchain-payment-preview', 'onchain-network-fee', 'onchain-preview-recipient', 'onchain-preview-amount', 'onchain-preview-fee', 'onchain-preview-speed', 'onchain-preview-total',
+        'onchain-send-estimate', 'onchain-estimate-fee', 'onchain-estimate-total', 'onchain-estimate-result-label', 'onchain-estimate-result', 'onchain-estimate-status',
+        'onchain-preview-result-label', 'onchain-preview-remaining', 'onchain-preview-status', 'onchain-balance-preview', 'onchain-balance-privacy-toggle'
     ].forEach(id => { elements[id] = new FakeElement(); });
     elements['payment-input'].value = 'lnbc1invoice';
     return elements;
@@ -54,6 +58,7 @@ describe('withdrawal balance flow', () => {
         vi.resetModules();
         state.balance = 10_000;
         state.preparedPayment = { paymentMethod: {} };
+        state.sdk.prepareSendPayment.mockReset();
         notifications.showError.mockReset();
     });
 
@@ -175,5 +180,24 @@ describe('withdrawal balance flow', () => {
         expect(html).toContain('id="onchain-estimate-total"');
         expect(html).toContain('id="onchain-estimate-result"');
         expect(html).toContain('id="onchain-preview-remaining"');
+    });
+
+    it('renders selected on-chain quote amounts with sats and fiat-secondary slots before enabling Send', async () => {
+        const elements = createFixture();
+        elements['onchain-address-input'].value = 'bc1q' + 'a'.repeat(38);
+        elements['onchain-amount-input'].value = '9000';
+        state.sdk.prepareSendPayment.mockResolvedValue({ paymentMethod: { feeQuote: { speedMedium: { userFeeSat: 500, l1BroadcastFeeSat: 501 } } } });
+        vi.stubGlobal('document', {
+            getElementById: (id: string) => elements[id] || null,
+            createElement: () => new FakeElement(),
+            querySelectorAll: () => []
+        });
+        const { setupWithdrawalListeners } = await import('./withdrawal');
+        setupWithdrawalListeners();
+        await (elements['preview-onchain-payment-btn'].listeners.get('click')?.[0] as any)();
+
+        expect(elements['onchain-estimate-fee'].children[0].textContent).toBe('1,001 sats');
+        expect(elements['onchain-estimate-total'].children[0].textContent).toBe('10,001 sats');
+        expect(elements['send-onchain-payment-btn'].disabled).toBe(true);
     });
 });
