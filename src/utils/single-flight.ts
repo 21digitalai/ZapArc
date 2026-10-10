@@ -1,9 +1,9 @@
-export function createSingleFlight(task: () => Promise<void>): () => Promise<void> {
+export function createSingleFlight<Args extends unknown[]>(task: (...args: Args) => Promise<void>): (...args: Args) => Promise<void> {
     let inFlight: Promise<void> | null = null;
 
-    return () => {
+    return (...args: Args) => {
         if (inFlight) return inFlight;
-        inFlight = task().finally(() => { inFlight = null; });
+        inFlight = task(...args).finally(() => { inFlight = null; });
         return inFlight;
     };
 }

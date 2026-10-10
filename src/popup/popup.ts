@@ -3192,7 +3192,11 @@ function setupEventListeners() {
         settingsViewSeedBtn.onclick = () => { handleSettingsViewRecoveryPhrase(); };
     }
 
-    window.addEventListener('zaparc:change-master-pin', () => { void handleSettingsChangePin(); });
+    window.addEventListener('zaparc:change-master-pin', (event) => {
+        const detail = (event as CustomEvent<{ masterId?: unknown; button?: unknown }>).detail;
+        if (typeof detail?.masterId !== 'string' || !(detail.button instanceof HTMLButtonElement)) return;
+        void handleSettingsChangePin(detail.masterId, detail.button);
+    });
 
     const settingsLightningAddressToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
     if (settingsLightningAddressToggleBtn) {
@@ -3645,16 +3649,16 @@ async function handleSettingsViewRecoveryPhrase(): Promise<void> {
     }
 }
 
-async function executeSettingsChangePin(): Promise<void> {
-    const button = document.querySelector('.master-wallet-pin-btn') as HTMLButtonElement | null;
-    if (button) button.disabled = true;
+async function executeSettingsChangePin(expectedMasterId: string, button: HTMLButtonElement): Promise<void> {
+    button.disabled = true;
     try {
         await runPinChangeFlow({
+            expectedMasterId,
             getActiveWallet: async () => {
                 const result = await chrome.storage.local.get(['multiWalletData']);
                 const data = result.multiWalletData ? JSON.parse(result.multiWalletData) : null;
                 const id = data?.activeWalletId;
-                if (!id) return null;
+                if (!id || id !== expectedMasterId) return null;
                 const wallet = data?.wallets?.find((entry: any) => entry?.metadata?.id === id);
                 return { id, name: wallet?.metadata?.nickname || 'current wallet' };
             },
@@ -3662,14 +3666,16 @@ async function executeSettingsChangePin(): Promise<void> {
                 const sessionData = await chrome.storage.session.get(['walletSessionPin', 'walletSessionMasterKeyId']);
                 const activeWallet = await chrome.storage.local.get(['multiWalletData']);
                 const activeWalletId = activeWallet.multiWalletData ? JSON.parse(activeWallet.multiWalletData)?.activeWalletId : null;
-                if (!activeWalletId || sessionData.walletSessionMasterKeyId !== activeWalletId) return null;
+                if (!activeWalletId || activeWalletId !== expectedMasterId || sessionData.walletSessionMasterKeyId !== expectedMasterId) return null;
                 return sessionData.walletSessionPin || null;
             },
             promptForPin: promptForPIN,
             rotate: ExtensionMessaging.changeActiveWalletPin,
             persistSessionPin: async (pin) => {
+                const activeWalletId = await getActiveWalletId();
+                if (activeWalletId !== expectedMasterId) throw new Error('Active wallet changed; try again');
                 setSessionPin(pin);
-                await chrome.storage.session.set({ walletSessionPin: pin, walletSessionMasterKeyId: await getActiveWalletId() });
+                await chrome.storage.session.set({ walletSessionPin: pin, walletSessionMasterKeyId: expectedMasterId });
             },
             showError,
             showSuccess,
@@ -3677,14 +3683,14 @@ async function executeSettingsChangePin(): Promise<void> {
     } catch (error) {
         showError(error instanceof Error ? error.message : 'Failed to change PIN');
     } finally {
-        if (button) button.disabled = false;
+        button.disabled = false;
     }
 }
 
 const runSettingsPinChange = createSingleFlight(executeSettingsChangePin);
 
-async function handleSettingsChangePin(): Promise<void> {
-    await runSettingsPinChange();
+async function handleSettingsChangePin(expectedMasterId: string, button: HTMLButtonElement): Promise<void> {
+    await runSettingsPinChange(expectedMasterId, button);
 }
 
 function showSeedPhraseModal(mnemonic: string, walletName: string): void {

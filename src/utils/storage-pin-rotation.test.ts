@@ -111,6 +111,6 @@ describe('Master-wallet Change PIN action', () => {
         expect(walletManagement).toContain("data-master-id=\"${wallet.id}\"");
         expect(walletManagement).toContain('attachMasterWalletPinActions(document');
         expect(pinAction).toContain("querySelectorAll('.master-wallet-pin-btn')");
-        expect(walletManagement).toContain("window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }))");
+        expect(walletManagement).toContain("window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId, button } }))");
     });
 });

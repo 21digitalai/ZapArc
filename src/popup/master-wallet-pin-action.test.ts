@@ -39,8 +39,9 @@ describe('master-wallet Change PIN action', () => {
         const switchToMaster = vi.fn().mockImplementation(async (masterId: string) => {
             activeMasterId = masterId;
         });
-        const dispatchPinChange = vi.fn().mockImplementation(async () => {
+        const dispatchPinChange = vi.fn().mockImplementation(async (masterId: string) => {
             await runPinChangeFlow({
+                expectedMasterId: masterId,
                 getActiveWallet: async () => ({ id: activeMasterId, name: activeMasterId }),
                 getAuthenticatedSessionPin: async () => activeMasterId === 'target' ? '111111' : null,
                 promptForPin: vi.fn().mockResolvedValue('222222'),
@@ -64,6 +65,38 @@ describe('master-wallet Change PIN action', () => {
         await vi.waitFor(() => expect(rotate).toHaveBeenCalledWith('target', '111111', '222222'));
         expect(rotate).not.toHaveBeenCalledWith('former-active', expect.anything(), expect.anything());
         expect(switchToMaster).toHaveBeenCalledWith('target');
+    });
+
+    it('does not rotate when the active master changes after dispatch but before popup snapshot', async () => {
+        const targetButton = button('target');
+        let activeMasterId = 'former-active';
+        const rotate = vi.fn().mockResolvedValue({ success: true });
+        const dispatchPinChange = vi.fn().mockImplementation(async (masterId: string) => {
+            activeMasterId = 'other-master';
+            await runPinChangeFlow({
+                expectedMasterId: masterId,
+                getActiveWallet: async () => ({ id: activeMasterId, name: activeMasterId }),
+                getAuthenticatedSessionPin: vi.fn().mockResolvedValue('111111'),
+                promptForPin: vi.fn().mockResolvedValue('222222'),
+                rotate,
+                persistSessionPin: vi.fn(),
+                showError: vi.fn(),
+                showSuccess: vi.fn(),
+            });
+        });
+        attachMasterWalletPinActions(
+            { querySelectorAll: vi.fn().mockReturnValue([targetButton]) },
+            {
+                switchToMaster: vi.fn().mockImplementation(async () => { activeMasterId = 'target'; }),
+                getActiveWallet: async () => ({ masterId: activeMasterId, subWalletIndex: 0 }),
+                dispatchPinChange,
+            },
+        );
+
+        await targetButton.click();
+
+        await vi.waitFor(() => expect(dispatchPinChange).toHaveBeenCalledWith('target', targetButton));
+        expect(rotate).not.toHaveBeenCalled();
     });
 
     it('has no sub-wallet listener and aborts a cancelled or raced switch before PIN rotation dispatch', async () => {

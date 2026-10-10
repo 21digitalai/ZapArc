@@ -632,8 +632,8 @@ function attachDropdownListeners(): void {
                 subWalletIndex: data.activeSubWalletIndex || 0,
             };
         },
-        dispatchPinChange: (masterId) => {
-            window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }));
+        dispatchPinChange: (masterId, button) => {
+            window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId, button } }));
         },
     });
     // Master wallet header click to switch to master (index 0)

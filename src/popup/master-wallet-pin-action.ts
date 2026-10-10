@@ -1,7 +1,7 @@
 type MasterWalletPinActionDependencies = {
     switchToMaster(masterId: string): Promise<void>;
     getActiveWallet(): Promise<{ masterId: string; subWalletIndex: number } | null>;
-    dispatchPinChange(masterId: string): void;
+    dispatchPinChange(masterId: string, button: PinActionButton): void;
 };
 
 type PinActionButton = {
@@ -39,5 +39,5 @@ async function handleMasterWalletPinAction(
     const activeWallet = await dependencies.getActiveWallet();
     if (!activeWallet || activeWallet.masterId !== masterId || activeWallet.subWalletIndex !== 0) return;
 
-    dependencies.dispatchPinChange(masterId);
+    dependencies.dispatchPinChange(masterId, button);
 }

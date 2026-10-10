@@ -13,6 +13,7 @@ function flow(
     return {
         rotate, persistSessionPin, showError, showSuccess, promptForPin,
         run: () => runPinChangeFlow({
+            expectedMasterId: 'active',
             getActiveWallet: vi.fn().mockResolvedValue({ id: 'active', name: 'Primary' }),
             getAuthenticatedSessionPin: vi.fn().mockResolvedValue(sessionPin),
             promptForPin,
@@ -57,7 +58,7 @@ describe('Settings Change PIN popup flow seam', () => {
         const fixture = flow(['222222', '222222'], undefined, null);
         await fixture.run();
         expect(fixture.rotate).not.toHaveBeenCalled();
-        expect(fixture.promptForPin).toHaveBeenCalledTimes(2);
+        expect(fixture.promptForPin).not.toHaveBeenCalled();
         expect(fixture.showError).toHaveBeenCalledWith('Unlock the current wallet before changing PIN');
     });
 
@@ -68,6 +69,7 @@ describe('Settings Change PIN popup flow seam', () => {
         const rotate = vi.fn().mockResolvedValue({ success: true });
         const showError = vi.fn();
         await runPinChangeFlow({
+            expectedMasterId: 'active',
             getActiveWallet,
             getAuthenticatedSessionPin: vi.fn().mockResolvedValue('111111'),
             promptForPin: vi.fn().mockResolvedValue('222222'),
