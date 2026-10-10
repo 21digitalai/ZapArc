@@ -567,6 +567,7 @@ export async function populateWalletDropdown(): Promise<void> {
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
                                 <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
+                            <button class="master-wallet-pin-btn" type="button" data-master-id="${wallet.id}" aria-label="Change PIN for ${wallet.nickname}">🔐</button>
                             ${masterStatusIcon}
                         </div>
 
@@ -599,6 +600,7 @@ export async function populateWalletDropdown(): Promise<void> {
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
                                 <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
+                            <button class="master-wallet-pin-btn" type="button" data-master-id="${wallet.id}" aria-label="Change PIN for ${wallet.nickname}">🔐</button>
                             ${statusIcon}
                         </div>
                     </div>
@@ -618,6 +620,18 @@ export async function populateWalletDropdown(): Promise<void> {
  * Attach listeners to hierarchical dropdown items
  */
 function attachDropdownListeners(): void {
+    document.querySelectorAll('.master-wallet-pin-btn').forEach(button => {
+        button.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const masterId = (event.currentTarget as HTMLElement).getAttribute('data-master-id');
+            if (!masterId) return;
+            await handleHierarchicalWalletSwitch(masterId, 0);
+            const storage = await chrome.storage.local.get(['multiWalletData']);
+            const data = storage.multiWalletData ? JSON.parse(storage.multiWalletData) : null;
+            if (data?.activeWalletId !== masterId || (data?.activeSubWalletIndex || 0) !== 0) return;
+            window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId } }));
+        });
+    });
     // Master wallet header click to switch to master (index 0)
     document.querySelectorAll('.master-key-dropdown-header[data-sub-index="0"]').forEach(header => {
         header.addEventListener('click', async (e) => {
@@ -2349,4 +2363,3 @@ async function handleRestoreArchivedSubWallet(masterId: string, subIndex: number
         showError('Failed to restore sub-wallet');
     }
 }
-

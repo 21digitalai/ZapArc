@@ -124,6 +124,8 @@
 
 `.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
 
+`.master-wallet-pin-btn` — master-wallet selector action for the existing Change PIN flow. It is absent from sub-wallet rows and switches/unlocks the selected master before dispatching the shared rotation flow.
+
 `.backup-settings`, `.backup-fields`, `.backup-copy` — Settings-local encrypted backup surface and grouped helper text.
 
 `.backup-input`, `.backup-action-btn`, `.backup-action-btn-secondary` — password/name fields and primary/secondary local backup actions.

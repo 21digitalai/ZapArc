@@ -3192,10 +3192,7 @@ function setupEventListeners() {
         settingsViewSeedBtn.onclick = () => { handleSettingsViewRecoveryPhrase(); };
     }
 
-    const settingsChangePinBtn = document.getElementById('settings-change-pin-btn');
-    if (settingsChangePinBtn) {
-        settingsChangePinBtn.onclick = () => { void handleSettingsChangePin(); };
-    }
+    window.addEventListener('zaparc:change-master-pin', () => { void handleSettingsChangePin(); });
 
     const settingsLightningAddressToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
     if (settingsLightningAddressToggleBtn) {
@@ -3649,7 +3646,7 @@ async function handleSettingsViewRecoveryPhrase(): Promise<void> {
 }
 
 async function executeSettingsChangePin(): Promise<void> {
-    const button = document.getElementById('settings-change-pin-btn') as HTMLButtonElement | null;
+    const button = document.querySelector('.master-wallet-pin-btn') as HTMLButtonElement | null;
     if (button) button.disabled = true;
     try {
         await runPinChangeFlow({
