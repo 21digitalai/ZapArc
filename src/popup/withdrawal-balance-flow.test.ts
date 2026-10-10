@@ -160,6 +160,8 @@ describe('withdrawal balance flow', () => {
         expect(html).toContain('id="send-balance-total"');
         expect(html).toContain('id="send-balance-result"');
         expect(html).not.toContain('Spendable balance');
+        expect(html.indexOf('id="withdrawal-comment"')).toBeLessThan(html.indexOf('id="send-balance-summary"'));
+        expect(html.indexOf('id="send-balance-summary"')).toBeLessThan(html.indexOf('id="preview-payment-btn"'));
     });
 
     it('places one fee-inclusive on-chain estimate before its preview action', () => {
