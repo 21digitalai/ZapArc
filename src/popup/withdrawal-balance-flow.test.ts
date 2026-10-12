@@ -12,7 +12,7 @@ vi.mock('./state', () => ({
 }));
 vi.mock('./contacts', () => ({ isExistingContact: vi.fn(), openContactModalWithAddress: vi.fn(), openContactPicker: vi.fn(), showContactsInterface: vi.fn() }));
 vi.mock('./notifications', () => ({ ...notifications, showSuccess: vi.fn() }));
-vi.mock('../utils/currency', () => ({ currencyService: {}, fiatToSats: vi.fn(), satsToFiat: vi.fn(async () => null), formatFiat: vi.fn(), formatSelectedCurrencyAmount: vi.fn(), getBtcSpotPrice: vi.fn() }));
+vi.mock('../utils/currency', () => ({ currencyService: {}, fiatToSats: vi.fn(), satsToFiat: vi.fn(async () => null), formatFiat: vi.fn(), formatSelectedCurrencyAmount: vi.fn(), getBtcSpotPrice: vi.fn(async () => null) }));
 vi.mock('./currency-pref', () => ({ getUserFiatCurrency: vi.fn(async () => 'usd'), getDisplayCurrency: vi.fn(), persistDisplayCurrency: vi.fn() }));
 
 class FakeElement {
@@ -41,12 +41,12 @@ function createFixture(): Record<string, FakeElement> {
     const elements: Record<string, FakeElement> = {};
     [
         'payment-preview', 'send-payment-btn', 'preview-recipient', 'preview-amount', 'preview-fee', 'preview-total', 'send-balance-preview',
-        'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-fee', 'send-balance-total', 'send-balance-result',
+        'preview-comment-row', 'preview-comment', 'send-balance-entry-status', 'send-balance-amount', 'send-balance-fee', 'send-balance-total', 'send-balance-result', 'send-balance-spot',
         'send-balance-result-label', 'send-balance-summary', 'preview-balance-result-label', 'preview-remaining', 'preview-balance-status', 'send-balance-privacy-toggle',
         'payment-input', 'withdrawal-amount', 'withdrawal-comment', 'preview-payment-btn',
         'onchain-address-input', 'onchain-amount-input', 'preview-onchain-payment-btn', 'send-onchain-payment-btn',
         'onchain-payment-preview', 'onchain-network-fee', 'onchain-preview-recipient', 'onchain-preview-amount', 'onchain-preview-fee', 'onchain-preview-speed', 'onchain-preview-total',
-        'onchain-send-estimate', 'onchain-estimate-fee', 'onchain-estimate-total', 'onchain-estimate-result-label', 'onchain-estimate-result', 'onchain-estimate-status',
+        'onchain-send-estimate', 'onchain-estimate-amount', 'onchain-estimate-fee', 'onchain-estimate-total', 'onchain-estimate-result-label', 'onchain-estimate-result', 'onchain-estimate-status', 'onchain-estimate-spot',
         'onchain-preview-result-label', 'onchain-preview-remaining', 'onchain-preview-status', 'onchain-balance-preview', 'onchain-balance-privacy-toggle'
     ].forEach(id => { elements[id] = new FakeElement(); });
     elements['payment-input'].value = 'lnbc1invoice';
@@ -113,10 +113,13 @@ describe('withdrawal balance flow', () => {
         elements['send-balance-privacy-toggle'].click();
         expect(elements['preview-remaining'].textContent).toBe('••••••');
         expect(elements['preview-fee'].children[0].textContent).toBe('••••••');
+        expect(elements['send-balance-privacy-toggle'].textContent).toBe('🙈');
+        expect(elements['onchain-balance-privacy-toggle'].attributes.get('aria-label')).toBe('Show balance values');
 
         elements['send-balance-privacy-toggle'].click();
         expect(elements['preview-fee'].children[0].textContent).toBe('75 sats');
         expect(elements['preview-remaining'].textContent).toBe('7,425 sats');
+        expect(elements['send-balance-privacy-toggle'].textContent).toBe('👁');
     });
 
     it('keeps unknown-fee and insufficient previews disabled and blocks dispatch', async () => {
@@ -132,6 +135,8 @@ describe('withdrawal balance flow', () => {
         expect(elements['send-payment-btn'].disabled).toBe(true);
         expect(elements['send-balance-fee'].textContent).toBe('Calculated at preview');
         expect(elements['send-balance-total'].textContent).toBe('Calculated at preview');
+        expect(elements['send-balance-result-label'].textContent).toBe('Remaining before fees');
+        expect(elements['send-balance-result'].children[0].textContent).toBe('7,500 sats');
 
         displayPaymentPreview({ recipient: 'Lightning Payment', amount: 9_950, fee: 75, type: 'bolt11' });
         expect(elements['send-payment-btn'].disabled).toBe(true);
@@ -184,6 +189,8 @@ describe('withdrawal balance flow', () => {
         expect((html.match(/id="send-balance-summary"/g) || [])).toHaveLength(1);
         expect(html).toContain('id="send-conversion-hint"');
         expect(html).toContain('id="send-balance-fee"');
+        expect(html).toContain('id="send-balance-amount"');
+        expect(html).toContain('id="send-balance-spot"');
         expect(html).toContain('id="send-balance-total"');
         expect(html).toContain('id="send-balance-result"');
         expect(html).not.toContain('Spendable balance');
@@ -199,6 +206,8 @@ describe('withdrawal balance flow', () => {
         expect(estimateIndex).toBeGreaterThan(-1);
         expect(estimateIndex).toBeLessThan(previewActionIndex);
         expect(html).toContain('id="onchain-estimate-fee"');
+        expect(html).toContain('id="onchain-estimate-amount"');
+        expect(html).toContain('id="onchain-estimate-spot"');
         expect(html).toContain('id="onchain-estimate-total"');
         expect(html).toContain('id="onchain-estimate-result"');
         expect(html).toContain('id="onchain-preview-remaining"');

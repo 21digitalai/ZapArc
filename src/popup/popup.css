@@ -3977,7 +3977,8 @@ body.modal-open {
 .send-balance-detail { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 12px; color: var(--text-secondary); }
 .send-balance-detail strong { color: var(--text-primary); text-align: right; }
 .send-balance-summary.insufficient .send-balance-detail strong { color: var(--error); }
-.send-balance-privacy-toggle { border: 0; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 16px; padding: 2px 4px; }
+.send-balance-privacy-toggle { border: 0; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+.send-balance-privacy-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-input); }
 .send-balance-status { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
 .send-balance-status.sufficient { color: var(--success); }
 .send-balance-status.insufficient { color: var(--error); }

@@ -46,6 +46,31 @@ function formatSensitiveSats(sats: number | null): string {
     return sats === null ? 'Fee unavailable' : `${sats.toLocaleString()} sats`;
 }
 
+function setPrivacyToggleState(toggle: HTMLButtonElement | null): void {
+    if (!toggle) return;
+    toggle.textContent = sendBalancesHidden ? '🙈' : '👁';
+    toggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
+    toggle.setAttribute('aria-pressed', String(sendBalancesHidden));
+}
+
+function refreshPrivacyToggles(): void {
+    setPrivacyToggleState(document.getElementById('send-balance-privacy-toggle') as HTMLButtonElement | null);
+    setPrivacyToggleState(document.getElementById('onchain-balance-privacy-toggle') as HTMLButtonElement | null);
+}
+
+function renderSpotRate(id: string): void {
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (sendBalancesHidden) {
+        element.textContent = '••••••';
+        return;
+    }
+    element.textContent = 'Loading rate…';
+    getBtcSpotPrice(userFiatCurrency)
+        .then((rate) => { element.textContent = rate || 'Spot rate unavailable'; })
+        .catch(() => { element.textContent = 'Spot rate unavailable'; });
+}
+
 function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     lastSendBalanceSummary = summary;
     const entryStatus = document.getElementById('send-balance-entry-status');
@@ -53,6 +78,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const previewStatus = document.getElementById('preview-balance-status');
     const previewCard = document.getElementById('send-balance-preview');
     const entryFee = document.getElementById('send-balance-fee');
+    const entryAmount = document.getElementById('send-balance-amount');
     const entryTotal = document.getElementById('send-balance-total');
     const entryResult = document.getElementById('send-balance-result');
     const entryResultLabel = document.getElementById('send-balance-result-label');
@@ -60,8 +86,13 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const minimumRequiredSats = summary.totalSats === null ? summary.amountSats : summary.totalSats;
     const shortfall = Math.max(0, minimumRequiredSats - summary.spendableSats);
     const isInsufficient = shortfall !== null && shortfall > 0;
-    const resultLabel = isInsufficient ? 'Short by' : 'Remaining after payment';
-    const result = isInsufficient ? shortfall : summary.remainingSats;
+    const hasKnownFee = summary.totalSats !== null;
+    const resultLabel = isInsufficient
+        ? 'Short by'
+        : hasKnownFee ? 'Remaining after payment' : 'Remaining before fees';
+    const result = isInsufficient
+        ? shortfall
+        : hasKnownFee ? summary.remainingSats : Math.max(0, summary.spendableSats - summary.amountSats);
     const setEntryAmount = (element: HTMLElement | null, sats: number | null, unavailable: string) => {
         if (!element) return;
         if (sats === null) {
@@ -70,18 +101,19 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
         }
         setPreviewAmount(element, sats);
     };
+    setEntryAmount(entryAmount, summary.amountSats, '—');
     setEntryAmount(entryFee, summary.feeSats, 'Calculated at preview');
     setEntryAmount(entryTotal, summary.totalSats, 'Calculated at preview');
-    setEntryAmount(entryResult, result, 'Fee unavailable');
+    setEntryAmount(entryResult, result, '—');
     if (entryResultLabel) entryResultLabel.textContent = resultLabel;
     if (previewRemaining) previewRemaining.textContent = formatSensitiveSats(result);
-    if (previewResultLabel) previewResultLabel.textContent = isInsufficient ? 'Short by:' : 'Remaining:';
+    if (previewResultLabel) previewResultLabel.textContent = isInsufficient ? 'Short by:' : hasKnownFee ? 'Remaining:' : 'Before fees:';
 
     const status = summary.hasSufficientFunds === false
         ? 'Insufficient balance — payment amount and fee are not covered.'
         : summary.hasSufficientFunds === true
             ? 'Sufficient funds for amount and fee.'
-            : 'Fee unavailable — remaining balance cannot be calculated yet.';
+            : 'Before fees — not final. Fee is calculated at preview.';
     [entryStatus, previewStatus].forEach((element) => {
         if (!element) return;
         element.textContent = status;
@@ -91,6 +123,7 @@ function renderSendBalanceSummary(summary: SendBalanceSummary): void {
     const card = document.getElementById('send-balance-summary');
     card?.classList.toggle('insufficient', isInsufficient);
     previewCard?.classList.toggle('insufficient', isInsufficient);
+    renderSpotRate('send-balance-spot');
 }
 
 function updateEntryBalanceSummary(): void {
@@ -497,11 +530,10 @@ export function setupWithdrawalListeners(): void {
     });
     sendBtn?.addEventListener('click', () => sendPayment());
     const privacyToggle = document.getElementById('send-balance-privacy-toggle') as HTMLButtonElement | null;
+    refreshPrivacyToggles();
     privacyToggle?.addEventListener('click', () => {
         sendBalancesHidden = !sendBalancesHidden;
-        privacyToggle.textContent = sendBalancesHidden ? '◌' : '◉';
-        privacyToggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
-        privacyToggle.setAttribute('aria-pressed', String(sendBalancesHidden));
+        refreshPrivacyToggles();
         updateEntryBalanceSummary();
         rerenderActivePaymentPreview();
         updateOnchainPreviewFromSelection();
@@ -509,12 +541,7 @@ export function setupWithdrawalListeners(): void {
     const onchainPrivacyToggle = document.getElementById('onchain-balance-privacy-toggle') as HTMLButtonElement | null;
     onchainPrivacyToggle?.addEventListener('click', () => {
         sendBalancesHidden = !sendBalancesHidden;
-        [privacyToggle, onchainPrivacyToggle].forEach((toggle) => {
-            if (!toggle) return;
-            toggle.textContent = sendBalancesHidden ? '◌' : '◉';
-            toggle.setAttribute('aria-label', sendBalancesHidden ? 'Show balance values' : 'Hide balance values');
-            toggle.setAttribute('aria-pressed', String(sendBalancesHidden));
-        });
+        refreshPrivacyToggles();
         updateEntryBalanceSummary();
         rerenderActivePaymentPreview();
         updateOnchainPreviewFromSelection();
@@ -628,16 +655,17 @@ function renderOnchainBalanceSummary(): SendBalanceSummary {
     const summary = getOnchainBalanceSummary();
     const hasAmount = summary.amountSats > 0;
     const isInsufficient = summary.hasSufficientFunds === false;
+    const hasKnownFee = summary.totalSats !== null;
     const result = isInsufficient
         ? Math.max(0, (summary.totalSats === null ? summary.amountSats : summary.totalSats) - summary.spendableSats)
-        : summary.remainingSats;
+        : hasKnownFee ? summary.remainingSats : Math.max(0, summary.spendableSats - summary.amountSats);
     const status = !hasAmount
         ? 'Enter an address and amount to get a fee quote.'
         : isInsufficient
             ? 'Insufficient balance — payment amount and selected fee are not covered.'
             : summary.hasSufficientFunds === true
                 ? 'Sufficient funds for amount and selected fee.'
-                : 'Fee quote unavailable — remaining balance cannot be calculated yet.';
+                : 'Before fees — not final. Fee quote is still loading.';
     const setText = (id: string, value: string) => {
         const element = document.getElementById(id);
         if (element) element.textContent = value;
@@ -652,11 +680,12 @@ function renderOnchainBalanceSummary(): SendBalanceSummary {
         setPreviewAmount(element, sats);
     };
     setEstimateAmount('onchain-estimate-fee', summary.feeSats, 'Waiting for fee quote');
+    setEstimateAmount('onchain-estimate-amount', summary.amountSats, '—');
     setEstimateAmount('onchain-estimate-total', summary.totalSats, 'Waiting for fee quote');
-    setText('onchain-estimate-result-label', isInsufficient ? 'Short by' : 'Remaining after payment');
+    setText('onchain-estimate-result-label', isInsufficient ? 'Short by' : hasKnownFee ? 'Remaining after payment' : 'Remaining before fees');
     setEstimateAmount('onchain-estimate-result', hasAmount ? result : null, '—');
     setText('onchain-estimate-status', status);
-    setText('onchain-preview-result-label', isInsufficient ? 'Short by:' : 'Remaining:');
+    setText('onchain-preview-result-label', isInsufficient ? 'Short by:' : hasKnownFee ? 'Remaining:' : 'Before fees:');
     setText('onchain-preview-remaining', formatSensitiveSats(result));
     setText('onchain-preview-status', status);
     ['onchain-send-estimate', 'onchain-balance-preview'].forEach((id) => {
@@ -667,6 +696,7 @@ function renderOnchainBalanceSummary(): SendBalanceSummary {
         element?.classList.toggle('insufficient', isInsufficient);
         element?.classList.toggle('sufficient', summary.hasSufficientFunds === true);
     });
+    renderSpotRate('onchain-estimate-spot');
     return summary;
 }
 

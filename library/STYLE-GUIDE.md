@@ -134,6 +134,10 @@
 
 `.send-balance-detail` — compact Send estimate-card row for fee-inclusive total and post-payment result; use within the single `.send-balance-summary` surface and apply its semantic insufficient state rather than creating duplicate balance cards.
 
+`.send-balance-spot` — BTC spot-rate context row in the Send estimate card. It is secondary to sats-primary payment, fee, total, and remaining values and is masked by the shared Send privacy state.
+
+`.send-balance-privacy-toggle` — accessible shared Lightning/on-chain balance privacy control. It renders recognizable eye/eye-off states, exposes Hide/Show balance labels plus `aria-pressed`, and must keep all value surfaces synchronized through the one Send privacy state.
+
 `.onchain-send-estimate` — on-chain Send instance of the shared fee-inclusive estimate surface. It owns only the selected on-chain fee quote and is rendered immediately above the preview action; its `.send-balance-detail`, `.send-balance-status`, and `.send-balance-preview` children reuse the Lightning estimate contract.
 
 ### Transaction diagnostics
