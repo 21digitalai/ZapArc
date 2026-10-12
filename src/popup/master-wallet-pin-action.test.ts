@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { attachMasterWalletPinActions } from './master-wallet-pin-action';
 import { runPinChangeFlow } from './pin-change-flow';
 
@@ -32,6 +33,21 @@ function attach(
 }
 
 describe('master-wallet Change PIN action', () => {
+    it('places the labeled action beside Reveal Seed in Manage Wallets, not in the switch dropdown', () => {
+        const source = readFileSync(new URL('./wallet-management.ts', import.meta.url), 'utf8');
+        const securityRow = source.indexOf('master-key-security-actions');
+        const revealSeed = source.indexOf('Reveal Seed Phrase');
+        const changePin = source.indexOf('🔐 Change PIN');
+        const dropdown = source.indexOf('master-key-dropdown-header');
+        const dropdownEnd = source.indexOf('walletList.innerHTML = html');
+
+        expect(securityRow).toBeGreaterThan(-1);
+        expect(revealSeed).toBeGreaterThan(-1);
+        expect(changePin).toBeGreaterThan(revealSeed);
+        expect(changePin).toBeGreaterThan(securityRow);
+        expect(source.slice(dropdown, dropdownEnd)).not.toContain('master-wallet-pin-btn');
+    });
+
     it('drives the actual master-menu listener to select and rotate only the target master', async () => {
         const targetButton = button('target');
         let activeMasterId = 'former-active';

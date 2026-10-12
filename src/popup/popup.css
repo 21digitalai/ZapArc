@@ -2397,6 +2397,9 @@ body.modal-open {
   margin-bottom: 8px;
 }
 
+.master-key-security-actions .wallet-mgmt-btn,
+.master-wallet-pin-btn { min-width: 0; }
+
 /* Sub-Wallet List (nested) */
 .sub-wallet-list {
   border-top: 1px solid var(--border-subtle);
@@ -3985,8 +3988,8 @@ body.modal-open {
 .send-balance-preview { border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; padding-top: 8px; }
 .send-balance-preview.insufficient { border: 1px solid var(--error); border-radius: var(--radius-input); padding: 8px; background: rgba(255, 84, 84, 0.08); }
 .send-balance-preview.insufficient .payment-preview-value { color: var(--error); }
-.master-wallet-pin-btn { border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; padding: 4px; }
-.master-wallet-pin-btn:hover { color: var(--brand); }
+.master-wallet-pin-btn { flex: 1; padding: 8px 12px; border: 1px solid var(--border-medium); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.master-wallet-pin-btn:hover { background: rgba(255, 255, 255, 0.1); }
 .payment-preview { padding: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 16px; }
 .payment-preview-title { margin-bottom: 12px; }
 .payment-preview-row { display: flex; justify-content: space-between; margin-bottom: 8px; overflow: hidden; }

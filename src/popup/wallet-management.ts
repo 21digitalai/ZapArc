@@ -568,7 +568,6 @@ export async function populateWalletDropdown(): Promise<void> {
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
                                 <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
-                            <button class="master-wallet-pin-btn" type="button" data-master-id="${wallet.id}" aria-label="Change PIN for ${wallet.nickname}">🔐</button>
                             ${masterStatusIcon}
                         </div>
 
@@ -601,7 +600,6 @@ export async function populateWalletDropdown(): Promise<void> {
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
                                 <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
-                            <button class="master-wallet-pin-btn" type="button" data-master-id="${wallet.id}" aria-label="Change PIN for ${wallet.nickname}">🔐</button>
                             ${statusIcon}
                         </div>
                     </div>
@@ -620,8 +618,8 @@ export async function populateWalletDropdown(): Promise<void> {
 /**
  * Attach listeners to hierarchical dropdown items
  */
-function attachDropdownListeners(): void {
-    attachMasterWalletPinActions(document, {
+function masterWalletPinActionDependencies(): Parameters<typeof attachMasterWalletPinActions>[1] {
+    return {
         switchToMaster: async (masterId) => handleHierarchicalWalletSwitch(masterId, 0),
         getActiveWallet: async () => {
             const storage = await chrome.storage.local.get(['multiWalletData']);
@@ -635,7 +633,10 @@ function attachDropdownListeners(): void {
         dispatchPinChange: (masterId, button) => {
             window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId, button } }));
         },
-    });
+    };
+}
+
+function attachDropdownListeners(): void {
     // Master wallet header click to switch to master (index 0)
     document.querySelectorAll('.master-key-dropdown-header[data-sub-index="0"]').forEach(header => {
         header.addEventListener('click', async (e) => {
@@ -1202,11 +1203,17 @@ async function loadHierarchicalWalletList(): Promise<void> {
                         Delete
                     </button>
                 </div>
-                <div class="master-key-actions">
+                <div class="master-key-actions master-key-security-actions">
                     <button class="wallet-mgmt-btn reveal-seed-btn"
                             data-master-id="${mk.id}"
                             data-master-name="${mk.nickname}">
                         🔑 Reveal Seed Phrase
+                    </button>
+                    <button class="master-wallet-pin-btn"
+                            type="button"
+                            data-master-id="${mk.id}"
+                            aria-label="Change PIN for ${mk.nickname}">
+                        🔐 Change PIN
                     </button>
                 </div>
                 <div class="master-key-actions">
@@ -1260,6 +1267,7 @@ async function loadHierarchicalWalletList(): Promise<void> {
  * Attach event listeners for hierarchical wallet management
  */
 function attachHierarchicalWalletListeners(): void {
+    attachMasterWalletPinActions(document, masterWalletPinActionDependencies());
     // Master key expand/collapse
     document.querySelectorAll('.master-key-header').forEach(header => {
         header.addEventListener('click', (e) => {

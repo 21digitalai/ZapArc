@@ -124,7 +124,9 @@
 
 `.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
 
-`.master-wallet-pin-btn` — master-wallet selector action for the existing Change PIN flow. It is absent from sub-wallet rows and switches/unlocks the selected master before dispatching the shared rotation flow.
+`.master-key-security-actions` — paired Reveal Seed Phrase and Change PIN row in an expanded Manage Wallets master card. It keeps both security actions readable in the narrow popup.
+
+`.master-wallet-pin-btn` — clearly labeled master-wallet Change PIN action in `.master-key-security-actions`. It is absent from sub-wallet rows, the wallet-switch dropdown, and general Settings; it switches/unlocks the selected master before dispatching the shared rotation flow.
 
 `.backup-settings`, `.backup-fields`, `.backup-copy` — Settings-local encrypted backup surface and grouped helper text.
 
