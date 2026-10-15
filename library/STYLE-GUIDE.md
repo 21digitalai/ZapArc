@@ -124,7 +124,7 @@
 
 `.settings-change-pin-btn` — Change PIN action for the wallet named in `.settings-wallet-name`. It reuses `.settings-action-btn` and the existing PIN modal sequence; it captures the active master at click time and never renders persistent PIN values. This action is absent from Manage Wallets cards, the wallet-switch dropdown, and standalone `settings.html`.
 
-`.change-pin-copy`, `.change-pin-label`, `.change-pin-input` — dedicated current-wallet Change PIN modal copy, labels, and masked numeric fields. The single modal collects New PIN and Confirm PIN together, validates exact six-digit matching values inline, and never requests the old PIN.
+`.change-pin-copy`, `.change-pin-label`, `.change-pin-input`, `.change-pin-cancel`, `.change-pin-confirm` — dedicated current-wallet Change PIN modal copy, labels, masked numeric fields, and actions. The single modal collects New PIN and Confirm PIN together, validates exact six-digit matching values inline, and never requests the old PIN.
 
 `.backup-settings`, `.backup-fields`, `.backup-copy` — Settings-local encrypted backup surface and grouped helper text.
 
