@@ -36,7 +36,6 @@ import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK, discoverSubWalletsInPopup } from './sdk';
 import { showError, showSuccess, showInfo, showNotification } from './notifications';
 import { clearWalletDisplay, showTransactionsLoading } from './ui-helpers';
-import { attachMasterWalletPinActions } from './master-wallet-pin-action';
 
 // Track which wallets are currently being discovered
 const walletsBeingDiscovered = new Set<string>();
@@ -618,24 +617,6 @@ export async function populateWalletDropdown(): Promise<void> {
 /**
  * Attach listeners to hierarchical dropdown items
  */
-function masterWalletPinActionDependencies(): Parameters<typeof attachMasterWalletPinActions>[1] {
-    return {
-        switchToMaster: async (masterId) => handleHierarchicalWalletSwitch(masterId, 0),
-        getActiveWallet: async () => {
-            const storage = await chrome.storage.local.get(['multiWalletData']);
-            const data = storage.multiWalletData ? JSON.parse(storage.multiWalletData) : null;
-            if (!data?.activeWalletId) return null;
-            return {
-                masterId: data.activeWalletId,
-                subWalletIndex: data.activeSubWalletIndex || 0,
-            };
-        },
-        dispatchPinChange: (masterId, button) => {
-            window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId, button } }));
-        },
-    };
-}
-
 function attachDropdownListeners(): void {
     // Master wallet header click to switch to master (index 0)
     document.querySelectorAll('.master-key-dropdown-header[data-sub-index="0"]').forEach(header => {
@@ -1203,17 +1184,11 @@ async function loadHierarchicalWalletList(): Promise<void> {
                         Delete
                     </button>
                 </div>
-                <div class="master-key-actions master-key-security-actions">
+                <div class="master-key-actions">
                     <button class="wallet-mgmt-btn reveal-seed-btn"
                             data-master-id="${mk.id}"
                             data-master-name="${mk.nickname}">
                         🔑 Reveal Seed Phrase
-                    </button>
-                    <button class="master-wallet-pin-btn"
-                            type="button"
-                            data-master-id="${mk.id}"
-                            aria-label="Change PIN for ${mk.nickname}">
-                        🔐 Change PIN
                     </button>
                 </div>
                 <div class="master-key-actions">
@@ -1267,7 +1242,6 @@ async function loadHierarchicalWalletList(): Promise<void> {
  * Attach event listeners for hierarchical wallet management
  */
 function attachHierarchicalWalletListeners(): void {
-    attachMasterWalletPinActions(document, masterWalletPinActionDependencies());
     // Master key expand/collapse
     document.querySelectorAll('.master-key-header').forEach(header => {
         header.addEventListener('click', (e) => {

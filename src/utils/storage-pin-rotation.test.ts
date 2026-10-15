@@ -101,16 +101,17 @@ describe('rotateMasterKeyPin', () => {
 });
 
 describe('Master-wallet Change PIN action', () => {
-    it('keeps Change PIN out of Settings and on master-wallet entries only', () => {
+    it('keeps Change PIN in current-wallet Settings and out of Manage Wallets', () => {
         const popupHtml = readFileSync(new URL('../popup/popup.html', import.meta.url), 'utf8');
+        const popup = readFileSync(new URL('../popup/popup.ts', import.meta.url), 'utf8');
         const walletManagement = readFileSync(new URL('../popup/wallet-management.ts', import.meta.url), 'utf8');
-        const pinAction = readFileSync(new URL('../popup/master-wallet-pin-action.ts', import.meta.url), 'utf8');
 
-        expect(popupHtml).not.toContain('id="settings-change-pin-btn"');
-        expect(walletManagement).toContain('class="master-wallet-pin-btn"');
-        expect(walletManagement).toContain("data-master-id=\"${wallet.id}\"");
-        expect(walletManagement).toContain('attachMasterWalletPinActions(document');
-        expect(pinAction).toContain("querySelectorAll('.master-wallet-pin-btn')");
-        expect(walletManagement).toContain("window.dispatchEvent(new CustomEvent('zaparc:change-master-pin', { detail: { masterId, button } }))");
+        expect(popupHtml).toContain('id="settings-change-pin-btn"');
+        expect(popupHtml).toContain('id="settings-wallet-name"');
+        expect(popup).toContain("getElementById('settings-change-pin-btn')");
+        expect(popup).toContain('const expectedMasterId = await getActiveWalletId()');
+        expect(popup).toContain('runSettingsPinChange(expectedMasterId, button)');
+        expect(walletManagement).not.toContain('master-wallet-pin-btn');
+        expect(walletManagement).not.toContain('zaparc:change-master-pin');
     });
 });

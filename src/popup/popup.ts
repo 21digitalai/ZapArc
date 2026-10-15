@@ -3192,11 +3192,10 @@ function setupEventListeners() {
         settingsViewSeedBtn.onclick = () => { handleSettingsViewRecoveryPhrase(); };
     }
 
-    window.addEventListener('zaparc:change-master-pin', (event) => {
-        const detail = (event as CustomEvent<{ masterId?: unknown; button?: unknown }>).detail;
-        if (typeof detail?.masterId !== 'string' || !(detail.button instanceof HTMLButtonElement)) return;
-        void handleSettingsChangePin(detail.masterId, detail.button);
-    });
+    const settingsChangePinBtn = document.getElementById('settings-change-pin-btn') as HTMLButtonElement | null;
+    if (settingsChangePinBtn) {
+        settingsChangePinBtn.onclick = () => { void handleSettingsChangePin(settingsChangePinBtn); };
+    }
 
     const settingsLightningAddressToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
     if (settingsLightningAddressToggleBtn) {
@@ -3689,7 +3688,12 @@ async function executeSettingsChangePin(expectedMasterId: string, button: HTMLBu
 
 const runSettingsPinChange = createSingleFlight(executeSettingsChangePin);
 
-async function handleSettingsChangePin(expectedMasterId: string, button: HTMLButtonElement): Promise<void> {
+async function handleSettingsChangePin(button: HTMLButtonElement): Promise<void> {
+    const expectedMasterId = await getActiveWalletId();
+    if (!expectedMasterId) {
+        showError('No active wallet found');
+        return;
+    }
     await runSettingsPinChange(expectedMasterId, button);
 }
 

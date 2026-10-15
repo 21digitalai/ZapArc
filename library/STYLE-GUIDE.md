@@ -122,11 +122,7 @@
 
 `.settings-action-btn` with `.lightning-address-section` — settings disclosure pattern. Invoice expiry uses this existing disclosure with native select/input controls, clear labels, and inline validation.
 
-`.settings-change-pin-btn` — Change PIN wallet-security action. It reuses `.settings-action-btn` and the existing PIN modal sequence; no persistent PIN values are rendered in Settings.
-
-`.master-key-security-actions` — paired Reveal Seed Phrase and Change PIN row in an expanded Manage Wallets master card. It keeps both security actions readable in the narrow popup.
-
-`.master-wallet-pin-btn` — clearly labeled master-wallet Change PIN action in `.master-key-security-actions`. It is absent from sub-wallet rows, the wallet-switch dropdown, and general Settings; it switches/unlocks the selected master before dispatching the shared rotation flow.
+`.settings-change-pin-btn` — Change PIN action for the wallet named in `.settings-wallet-name`. It reuses `.settings-action-btn` and the existing PIN modal sequence; it captures the active master at click time and never renders persistent PIN values. This action is absent from Manage Wallets cards, the wallet-switch dropdown, and standalone `settings.html`.
 
 `.backup-settings`, `.backup-fields`, `.backup-copy` — Settings-local encrypted backup surface and grouped helper text.
 
