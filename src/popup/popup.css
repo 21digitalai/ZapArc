@@ -1921,6 +1921,10 @@ header h1 {
   letter-spacing: 2px;
 }
 
+.change-pin-copy { margin-bottom: 16px; }
+.change-pin-label { display: block; margin: 12px 0 6px; color: var(--text-primary); font-size: 13px; }
+.change-pin-input { text-align: center; font-size: 16px; letter-spacing: 2px; }
+
 /* Add Wallet Modals */
 #add-wallet-choice-modal .modal-body,
 #add-wallet-create-modal .modal-body,

@@ -1,11 +1,17 @@
 export type ActiveWallet = { id: string; name: string };
+export type PinChangeInput = { newPin: string; confirmation: string };
+export type PinRotation = (masterKeyId: string, currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
+
+export function createPinRotation(messaging: { changeActiveWalletPin: PinRotation }): PinRotation {
+    return (masterKeyId, currentPin, newPin) => messaging.changeActiveWalletPin(masterKeyId, currentPin, newPin);
+}
 
 export type PinChangeFlowDependencies = {
     expectedMasterId: string;
     getActiveWallet(): Promise<ActiveWallet | null>;
     getAuthenticatedSessionPin(): Promise<string | null>;
-    promptForPin(message: string): Promise<string | null>;
-    rotate(masterKeyId: string, currentPin: string, newPin: string): Promise<{ success: boolean; error?: string }>;
+    promptForChangePin(): Promise<PinChangeInput | null>;
+    rotate: PinRotation;
     persistSessionPin(pin: string): Promise<void>;
     showError(message: string): void;
     showSuccess(message: string): void;
@@ -23,10 +29,13 @@ export async function runPinChangeFlow(dependencies: PinChangeFlowDependencies):
         return;
     }
 
-    const newPin = await dependencies.promptForPin('Enter a new 6-digit PIN');
-    if (!newPin) return;
-    const confirmation = await dependencies.promptForPin('Confirm the new PIN');
-    if (!confirmation) return;
+    const change = await dependencies.promptForChangePin();
+    if (!change) return;
+    const { newPin, confirmation } = change;
+    if (!/^\d{6}$/.test(newPin) || !/^\d{6}$/.test(confirmation)) {
+        dependencies.showError('PIN must contain exactly 6 digits');
+        return;
+    }
     if (newPin !== confirmation) {
         dependencies.showError('New PINs do not match');
         return;

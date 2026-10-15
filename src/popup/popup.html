@@ -39,6 +39,25 @@
             </div>
         </div>
 
+        <div id="change-pin-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="change-pin-title">
+            <div class="modal-header">
+                <h3 id="change-pin-title">Change PIN</h3>
+                <button class="modal-close" type="button" aria-label="Close Change PIN dialog">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="change-pin-copy">Set a new six-digit PIN for the current wallet.</p>
+                <label class="change-pin-label" for="change-pin-new-input">New PIN</label>
+                <input type="password" id="change-pin-new-input" class="change-pin-input modal-input" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" />
+                <label class="change-pin-label" for="change-pin-confirm-input">Confirm PIN</label>
+                <input type="password" id="change-pin-confirm-input" class="change-pin-input modal-input" placeholder="Confirm 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" />
+                <div id="change-pin-modal-error" class="error-message hidden" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="change-pin-cancel" type="button" class="btn-secondary">Cancel</button>
+                <button id="change-pin-confirm" type="button" class="btn-primary">Change PIN</button>
+            </div>
+        </div>
+
         <!-- Add Wallet Modal - Choice -->
         <div id="add-wallet-choice-modal" class="modal hidden">
             <div class="modal-header">

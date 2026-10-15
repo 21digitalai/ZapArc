@@ -3,6 +3,7 @@
 
 import { BIP39_WORDS } from './state';
 import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
+import type { PinChangeInput } from './pin-change-flow';
 
 // ========================================
 // Modal State
@@ -77,6 +78,17 @@ export function closeCurrentModal(value: any): void {
         const input = document.getElementById('pin-modal-input') as HTMLInputElement | null;
         const error = document.getElementById('pin-modal-error');
         if (input) input.value = '';
+        if (error) {
+            error.textContent = '';
+            error.classList.add('hidden');
+        }
+    }
+    if (modalState.currentModal === 'change-pin-modal') {
+        ['change-pin-new-input', 'change-pin-confirm-input'].forEach(id => {
+            const input = document.getElementById(id) as HTMLInputElement | null;
+            if (input) input.value = '';
+        });
+        const error = document.getElementById('change-pin-modal-error');
         if (error) {
             error.textContent = '';
             error.classList.add('hidden');
@@ -242,6 +254,65 @@ export async function showPINModal(message: string): Promise<string | null> {
 // Legacy function for backward compatibility
 export async function promptForPIN(message: string): Promise<string | null> {
     return showPINModal(message);
+}
+
+export async function showChangePinModal(): Promise<PinChangeInput | null> {
+    return new Promise(resolve => {
+        modalState.resolveCallback = resolve;
+        let newPinInput = document.getElementById('change-pin-new-input') as HTMLInputElement | null;
+        let confirmationInput = document.getElementById('change-pin-confirm-input') as HTMLInputElement | null;
+        const error = document.getElementById('change-pin-modal-error');
+        let confirm = document.getElementById('change-pin-confirm') as HTMLButtonElement | null;
+        let cancel = document.getElementById('change-pin-cancel') as HTMLButtonElement | null;
+        if (!newPinInput || !confirmationInput || !confirm || !cancel) {
+            resolve(null);
+            return;
+        }
+
+        newPinInput = newPinInput.cloneNode(true) as HTMLInputElement;
+        confirmationInput = confirmationInput.cloneNode(true) as HTMLInputElement;
+        confirm = confirm.cloneNode(true) as HTMLButtonElement;
+        cancel = cancel.cloneNode(true) as HTMLButtonElement;
+        document.getElementById('change-pin-new-input')?.replaceWith(newPinInput);
+        document.getElementById('change-pin-confirm-input')?.replaceWith(confirmationInput);
+        document.getElementById('change-pin-confirm')?.replaceWith(confirm);
+        document.getElementById('change-pin-cancel')?.replaceWith(cancel);
+        newPinInput.value = '';
+        confirmationInput.value = '';
+        error?.classList.add('hidden');
+        const digitsOnly = (event: Event) => {
+            const input = event.target as HTMLInputElement;
+            input.value = input.value.replace(/\D/g, '');
+            error?.classList.add('hidden');
+        };
+        newPinInput.addEventListener('input', digitsOnly);
+        confirmationInput.addEventListener('input', digitsOnly);
+        const submit = () => {
+            const newPin = newPinInput.value;
+            const confirmation = confirmationInput.value;
+            if (!/^\d{6}$/.test(newPin) || !/^\d{6}$/.test(confirmation)) {
+                if (error) {
+                    error.textContent = 'Enter and confirm a six-digit PIN';
+                    error.classList.remove('hidden');
+                }
+                return;
+            }
+            if (newPin !== confirmation) {
+                if (error) {
+                    error.textContent = 'New PINs do not match';
+                    error.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal({ newPin, confirmation });
+        };
+        confirm.addEventListener('click', submit);
+        cancel.addEventListener('click', () => closeCurrentModal(null));
+        [newPinInput, confirmationInput].forEach(input => input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') submit();
+        }));
+        showModal('change-pin-modal');
+    });
 }
 
 /**

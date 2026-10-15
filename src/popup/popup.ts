@@ -56,8 +56,8 @@ import {
 } from './ui-helpers';
 
 // Modal imports
-import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
-import { runPinChangeFlow } from './pin-change-flow';
+import { setupModalListeners, showPINModal, promptForPIN, promptForText, showChangePinModal } from './modals';
+import { createPinRotation, runPinChangeFlow } from './pin-change-flow';
 import { createSingleFlight } from '../utils/single-flight';
 
 // Utility imports
@@ -3668,8 +3668,8 @@ async function executeSettingsChangePin(expectedMasterId: string, button: HTMLBu
                 if (!activeWalletId || activeWalletId !== expectedMasterId || sessionData.walletSessionMasterKeyId !== expectedMasterId) return null;
                 return sessionData.walletSessionPin || null;
             },
-            promptForPin: promptForPIN,
-            rotate: ExtensionMessaging.changeActiveWalletPin,
+            promptForChangePin: showChangePinModal,
+            rotate: createPinRotation(ExtensionMessaging),
             persistSessionPin: async (pin) => {
                 const activeWalletId = await getActiveWalletId();
                 if (activeWalletId !== expectedMasterId) throw new Error('Active wallet changed; try again');
